@@ -58,8 +58,7 @@ class DashboardPage:
                 ui.label('What is P.E.C.S.?').classes('text-xl font-bold mb-3')
                 with ui.column().classes('gap-2'):
                     ui.label('P - Prime & Preview: Skim and prepare for deeper reading').classes('text-sm')
-                    ui.label('
-E - Engage & Explain: Deep reading and understanding in your own words').classes('text-sm')
+                    ui.label('E - Engage & Explain: Deep reading and understanding in your own words').classes('text-sm')
                     ui.label('C - Challenge & Connect: Critical thinking and making connections').classes('text-sm')
                     ui.label('S - Solidify & Space: Create flashcards and spaced repetition review').classes('text-sm')
 
