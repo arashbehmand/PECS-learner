@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Project View Page - Shows project overview and section list
 """
@@ -31,7 +32,7 @@ class ProjectViewPage:
         if not self.project:
             with ui.column().classes('items-center mt-12'):
                 ui.label('Project not found').classes('text-xl text-red-500')
-                ui.button('ê Back to Dashboard', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
+                ui.button('ÔøΩ Back to Dashboard', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
             return
 
         # Header with project name and actions
@@ -76,13 +77,13 @@ class ProjectViewPage:
             # Action buttons
             with ui.row().classes('w-full gap-2 flex-wrap mt-4'):
                 ui.button(
-                    '=⁄ Study Mode',
+                    '=ÔøΩ Study Mode',
                     icon='school',
                     on_click=lambda: ui.navigate.to(f'/project/{self.project_id}/study')
                 ).classes('bg-green-500 flex-1 min-w-40')
 
                 ui.button(
-                    'ï Add Content',
+                    'ÔøΩ Add Content',
                     icon='add',
                     on_click=lambda: ui.navigate.to(f'/project/{self.project_id}/upload')
                 ).classes('bg-blue-500 flex-1 min-w-40')

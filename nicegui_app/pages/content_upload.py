@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Content Upload Page - Upload or paste learning material
 Migrated from components/content_upload_new.py
@@ -32,7 +33,7 @@ class ContentUploadPage:
 
         if not self.project:
             ui.label('Project not found').classes('text-xl text-red-500')
-            ui.button('ê Back to Dashboard', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
+            ui.button('ÔøΩ Back to Dashboard', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
             return
 
         # Header
@@ -143,7 +144,7 @@ class ContentUploadPage:
         update_input_method()
 
         # Processing configuration
-        ui.label('ô Processing Configuration').classes('text-xl font-bold mt-6 mb-4')
+        ui.label('ÔøΩ Processing Configuration').classes('text-xl font-bold mt-6 mb-4')
 
         with ui.grid(columns=2).classes('w-full gap-4'):
             min_size_slider = ui.slider(
@@ -236,7 +237,7 @@ class ContentUploadPage:
                 ui.notify(f'Error processing content: {str(ex)}', color='negative', position='top')
 
         ui.button(
-            '=Ä Process & Create Sections',
+            '=ÔøΩ Process & Create Sections',
             icon='rocket_launch',
             on_click=process_content
         ).classes('mt-6 bg-blue-500 text-lg px-8 py-3')

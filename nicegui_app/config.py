@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Configuration for PECS Learning System - NiceGUI App
 """

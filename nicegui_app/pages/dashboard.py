@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Project Dashboard - Main landing page
 Migrated from components/project_dashboard.py
@@ -28,9 +29,9 @@ class DashboardPage:
 
         # Header with branding
         with ui.row().classes('w-full items-center justify-between mb-6 flex-wrap gap-4'):
-            ui.label('=Ú P.E.C.S. Learning System').classes('text-2xl md:text-3xl font-bold')
+            ui.label('=ï¿½ P.E.C.S. Learning System').classes('text-2xl md:text-3xl font-bold')
             ui.button(
-                '• New Project',
+                'ï¿½ New Project',
                 icon='add',
                 on_click=self._show_create_project_dialog
             ).classes('bg-blue-500')
@@ -56,10 +57,10 @@ class DashboardPage:
             with ui.card().classes('w-full p-6 bg-blue-50'):
                 ui.label('What is P.E.C.S.?').classes('text-xl font-bold mb-3')
                 with ui.column().classes('gap-2'):
-                    ui.label('=Ö P - Prime & Preview: Skim and prepare for deeper reading').classes('text-sm')
+                    ui.label('=ï¿½ P - Prime & Preview: Skim and prepare for deeper reading').classes('text-sm')
                     ui.label(' E - Engage & Explain: Deep reading and understanding in your own words').classes('text-sm')
                     ui.label('> C - Challenge & Connect: Critical thinking and making connections').classes('text-sm')
-                    ui.label('<¯ S - Solidify & Space: Create flashcards and spaced repetition review').classes('text-sm')
+                    ui.label('<ï¿½ S - Solidify & Space: Create flashcards and spaced repetition review').classes('text-sm')
 
             ui.button(
                 'Create Your First Project',

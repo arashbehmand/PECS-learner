@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 PECS Learning System - NiceGUI Main Application
 Complete migration from Streamlit to NiceGUI with PWA support
@@ -176,9 +177,9 @@ def pecs_learning_page(project_id: int, section_id: int):
 # ===== MAIN ENTRY POINT =====
 if __name__ in {"__main__", "__mp_main__"}:
     print("\n" + "="*70)
-    print(f"=€ {config.APP_NAME} v{config.APP_VERSION}")
+    print(f"=ï¿½ {config.APP_NAME} v{config.APP_VERSION}")
     print("="*70)
-    print("\n=ñ Features:")
+    print("\n=ï¿½ Features:")
     print("    Complete NiceGUI migration from Streamlit")
     print("    Mobile-optimized responsive design")
     print("    Progressive Web App (PWA) - installable")
@@ -188,7 +189,7 @@ if __name__ in {"__main__", "__mp_main__"}:
     print("\n< Access:")
     print(f"   " Local: http://localhost:{config.PORT}")
     print(f"   " Network: http://<your-ip>:{config.PORT}")
-    print("\n=Ú Components:")
+    print("\n=ï¿½ Components:")
     print("    Project Dashboard")
     print("    Content Upload (EPUB, PDF, DOCX support)")
     print("    PECS Learning (4-phase system)")
@@ -200,7 +201,7 @@ if __name__ in {"__main__", "__mp_main__"}:
         port=config.PORT,
         host=config.HOST,
         title=config.APP_NAME,
-        favicon='=Ú',
+        favicon='=ï¿½',
         reload=config.RELOAD,
         show=False,  # Don't auto-open browser
     )

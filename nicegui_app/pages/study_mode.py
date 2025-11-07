@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Study Mode Page - Flashcard spaced repetition practice
 Migrated from components/study_mode.py
@@ -37,7 +38,7 @@ class StudyModePage:
 
         if not self.project:
             ui.label('Project not found').classes('text-xl text-red-500')
-            ui.button(' Back', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
+            ui.button('ï¿½ Back', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
             return
 
         # Header
@@ -100,7 +101,7 @@ class StudyModePage:
                 # Navigation
                 with ui.row().classes('w-full gap-2 mt-6'):
                     ui.button(
-                        'î Previous',
+                        'ï¿½ Previous',
                         on_click=lambda: self._navigate('prev', render_study_session)
                     ).classes('flex-1').props('outline')
 
@@ -110,7 +111,7 @@ class StudyModePage:
                     ).classes('flex-1').props('outline')
 
                     ui.button(
-                        'í Next',
+                        'ï¿½ Next',
                         on_click=lambda: self._navigate('next', render_study_session)
                     ).classes('flex-1').props('outline')
 
@@ -190,7 +191,7 @@ class StudyModePage:
             ui.label(f'No cards available for "{mode}"').classes('text-xl text-gray-500 text-center mt-4')
             ui.label('Create some flashcards in the Solidify phase').classes('text-gray-400 text-center')
             ui.button(
-                ' Back to Project',
+                'ï¿½ Back to Project',
                 on_click=lambda: ui.navigate.to(f'/project/{self.project_id}')
             ).classes('mt-4')
 
@@ -205,7 +206,7 @@ class StudyModePage:
 
         # Check if session complete
         if self.current_index >= len(self.study_cards):
-            ui.notify('<‰ Study session complete! Great work!', color='positive', position='top')
+            ui.notify('<ï¿½ Study session complete! Great work!', color='positive', position='top')
             self.current_index = 0
 
         refresh_callback()
@@ -227,7 +228,7 @@ class StudyModePage:
         stats = self.db.get_project_stats(self.project_id)
 
         with ui.card().classes('w-full max-w-md mx-auto mt-6 p-4'):
-            ui.label('=Ê Study Statistics').classes('text-lg font-bold mb-3')
+            ui.label('=ï¿½ Study Statistics').classes('text-lg font-bold mb-3')
 
             with ui.row().classes('w-full justify-around'):
                 with ui.column().classes('items-center'):
