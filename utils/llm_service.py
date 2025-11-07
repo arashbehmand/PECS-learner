@@ -2,34 +2,48 @@ import os
 import json
 import yaml
 from typing import Optional, Dict, Any, List
-import streamlit as st
+import logging
 from openai import OpenAI
 from openai.types.chat import ChatCompletion
 
+# Setup logging
+logger = logging.getLogger(__name__)
+
 class LLMService:
     def __init__(self):
-        """Initialize the LLM service with API key from Streamlit secrets."""
+        """Initialize the LLM service with API key from environment or secrets."""
         try:
             # Load prompts from YAML
             with open('utils/prompts.yaml', 'r') as f:
                 self.prompts = yaml.safe_load(f)
-            
-            # Try to get the API key
-            if "llm" in st.secrets:
-                self.api_key = st.secrets["llm"]["openai_api_key"]
-            else:
-                self.api_key = None
-            
+
+            # Try to get the API key from multiple sources
+            self.api_key = None
+
+            # 1. Try environment variable
+            self.api_key = os.getenv('OPENAI_API_KEY')
+
+            # 2. Try Streamlit secrets if available (for backward compatibility)
+            if not self.api_key:
+                try:
+                    import streamlit as st
+                    if hasattr(st, 'secrets') and "llm" in st.secrets:
+                        self.api_key = st.secrets["llm"]["openai_api_key"]
+                except (ImportError, FileNotFoundError, KeyError):
+                    pass
+
             # Initialize client if we have an API key
             if self.api_key:
                 self.client = OpenAI(api_key=self.api_key)
+                logger.info("LLM service initialized successfully")
             else:
                 self.client = None
-                
+                logger.warning("No OpenAI API key found. LLM features will be unavailable.")
+
             self.model = "gpt-3.5-turbo"  # Default to a cost-effective model
-            
+
         except Exception as e:
-            st.error(f"Error initializing LLM service: {str(e)}")
+            logger.error(f"Error initializing LLM service: {str(e)}")
             self.client = None
             self.api_key = None
             self.prompts = None
@@ -43,13 +57,13 @@ class LLMService:
         try:
             return self.prompts[module][prompt_type]
         except KeyError:
-            st.error(f"Prompt template not found: {module}.{prompt_type}")
+            logger.error(f"Prompt template not found: {module}.{prompt_type}")
             return None
 
     def _make_llm_call(self, system_prompt: str, user_prompt: str) -> Optional[str]:
         """Make a call to the LLM API."""
         if not self.is_available():
-            st.warning("LLM service is not available. Please check your API key configuration.")
+            logger.warning("LLM service is not available. Please check your API key configuration.")
             return None
 
         try:
@@ -64,7 +78,7 @@ class LLMService:
             )
             return response.choices[0].message.content
         except Exception as e:
-            st.error(f"Error making LLM call: {str(e)}")
+            logger.error(f"Error making LLM call: {str(e)}")
             return None
 
     # Prime Module Methods
@@ -175,7 +189,7 @@ class LLMService:
     def suggest_flashcards(self, chunk_text: str, user_explanation: str, user_challenges: str) -> Optional[List[Dict[str, str]]]:
         """Suggest flashcard Q/A pairs based on the material and user's understanding."""
         if not self.is_available():
-            st.warning("LLM service is not available. Please check your API key configuration.")
+            logger.warning("LLM service is not available. Please check your API key configuration.")
             return None
 
         try:
@@ -215,9 +229,9 @@ class LLMService:
                 if isinstance(qa_pairs, list):
                     return qa_pairs[:3]  # Return at most 3 pairs
             except json.JSONDecodeError:
-                st.error("Failed to parse flashcard suggestions as JSON")
+                logger.error("Failed to parse flashcard suggestions as JSON")
                 return None
 
         except Exception as e:
-            st.error(f"Error generating flashcard suggestions: {str(e)}")
+            logger.error(f"Error generating flashcard suggestions: {str(e)}")
             return None 

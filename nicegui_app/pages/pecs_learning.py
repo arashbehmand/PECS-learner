@@ -312,26 +312,48 @@ class PECSLearningPage:
         self.db.update_section_pecs_data(self.section_id, 'solidify_space', pecs_data)
         ui.notify('Saved!', color='positive', position='top')
 
-    def _get_ai_feedback(self, feedback_type: str, user_input: str):
+    async def _get_ai_feedback(self, feedback_type: str, user_input: str):
         """Get AI feedback on user input"""
         if not user_input:
             ui.notify('Please provide some input first', color='warning', position='top')
             return
 
+        # Check if LLM service is available
+        if not self.llm_service.is_available():
+            ui.notify('AI features require an OpenAI API key. Set OPENAI_API_KEY environment variable.',
+                     color='warning', position='top')
+            return
+
+        # Create loading dialog
         with ui.dialog() as dialog, ui.card().classes('max-w-2xl'):
-            ui.label('Analyzing...').classes('text-lg font-bold')
+            ui.label('Analyzing with AI...').classes('text-lg font-bold')
             ui.spinner(size='lg')
 
         dialog.open()
 
         try:
+            # Run LLM call in thread pool to avoid blocking UI
+            import asyncio
             feedback = None
+
             if feedback_type == 'section_understanding':
-                feedback = self.llm_service.analyze_section_understanding(self.section.content, user_input)
+                feedback = await asyncio.to_thread(
+                    self.llm_service.analyze_section_understanding,
+                    self.section.content,
+                    user_input
+                )
             elif feedback_type == 'explanation':
-                feedback = self.llm_service.analyze_explanation(self.section.content, user_input)
+                feedback = await asyncio.to_thread(
+                    self.llm_service.analyze_explanation,
+                    self.section.content,
+                    user_input
+                )
             elif feedback_type == 'critical_thinking':
-                feedback = self.llm_service.analyze_critical_thinking(self.section.content, user_input)
+                feedback = await asyncio.to_thread(
+                    self.llm_service.analyze_critical_thinking,
+                    self.section.content,
+                    user_input
+                )
 
             dialog.close()
 
@@ -342,13 +364,13 @@ class PECSLearningPage:
                     ui.button('Close', on_click=feedback_dialog.close).classes('mt-4')
                 feedback_dialog.open()
             else:
-                ui.notify('No feedback available', color='warning', position='top')
+                ui.notify('Could not generate feedback', color='warning', position='top')
 
         except Exception as e:
             dialog.close()
             ui.notify(f'Error: {str(e)}', color='negative', position='top')
 
-    def _generate_ai_flashcards(self):
+    async def _generate_ai_flashcards(self):
         """Generate flashcard suggestions using AI"""
         engage_data = self.section.pecs_data.get('engage_explain', {})
         explanation = engage_data.get('explanation', '')
@@ -357,29 +379,53 @@ class PECSLearningPage:
             ui.notify('Please complete the Engage phase first', color='warning', position='top')
             return
 
-        challenge_data = self.section.pecs_data.get('challenge_connect', {})
-        suggestions = self.llm_service.suggest_flashcards(
-            chunk_text=self.section.content,
-            user_explanation=explanation,
-            user_challenges=challenge_data.get('critical_questions', '')
-        )
+        # Check if LLM service is available
+        if not self.llm_service.is_available():
+            ui.notify('AI features require an OpenAI API key. Set OPENAI_API_KEY environment variable.',
+                     color='warning', position='top')
+            return
 
-        if suggestions:
-            with ui.dialog() as dialog, ui.card().classes('max-w-2xl'):
-                ui.label('AI Flashcard Suggestions').classes('text-xl font-bold mb-3')
-                for i, suggestion in enumerate(suggestions, 1):
-                    with ui.card().classes('w-full mb-2 bg-purple-50'):
-                        ui.label(f'Suggestion {i}').classes('font-semibold mb-2')
-                        ui.label(f'Q: {suggestion["question"]}').classes('text-sm mb-1')
-                        ui.label(f'A: {suggestion["answer"]}').classes('text-sm mb-2')
-                        ui.button(
-                            'Add This Card',
-                            on_click=lambda s=suggestion: self._add_ai_flashcard(s, dialog)
-                        ).classes('bg-blue-500 text-sm')
-                ui.button('Close', on_click=dialog.close).classes('mt-4')
-            dialog.open()
-        else:
-            ui.notify('No suggestions available', color='warning', position='top')
+        # Show loading indicator
+        with ui.dialog() as loading_dialog, ui.card().classes('max-w-2xl'):
+            ui.label('Generating flashcard suggestions...').classes('text-lg font-bold')
+            ui.spinner(size='lg')
+
+        loading_dialog.open()
+
+        try:
+            challenge_data = self.section.pecs_data.get('challenge_connect', {})
+
+            # Run LLM call in thread pool to avoid blocking UI
+            import asyncio
+            suggestions = await asyncio.to_thread(
+                self.llm_service.suggest_flashcards,
+                chunk_text=self.section.content,
+                user_explanation=explanation,
+                user_challenges=challenge_data.get('critical_questions', '')
+            )
+
+            loading_dialog.close()
+
+            if suggestions:
+                with ui.dialog() as dialog, ui.card().classes('max-w-2xl'):
+                    ui.label('AI Flashcard Suggestions').classes('text-xl font-bold mb-3')
+                    for i, suggestion in enumerate(suggestions, 1):
+                        with ui.card().classes('w-full mb-2 bg-purple-50'):
+                            ui.label(f'Suggestion {i}').classes('font-semibold mb-2')
+                            ui.label(f'Q: {suggestion["question"]}').classes('text-sm mb-1')
+                            ui.label(f'A: {suggestion["answer"]}').classes('text-sm mb-2')
+                            ui.button(
+                                'Add This Card',
+                                on_click=lambda s=suggestion: self._add_ai_flashcard(s, dialog)
+                            ).classes('bg-blue-500 text-sm')
+                    ui.button('Close', on_click=dialog.close).classes('mt-4')
+                dialog.open()
+            else:
+                ui.notify('No suggestions available', color='warning', position='top')
+
+        except Exception as e:
+            loading_dialog.close()
+            ui.notify(f'Error: {str(e)}', color='negative', position='top')
 
     def _add_ai_flashcard(self, suggestion: dict, dialog):
         """Add AI-suggested flashcard"""
