@@ -123,10 +123,6 @@ def setup_pwa():
     ''')
 
 
-# Setup PWA
-setup_pwa()
-
-
 # ===== ROUTING =====
 
 @ui.page('/')
@@ -201,6 +197,9 @@ if __name__ in {"__main__", "__mp_main__"}:
     print("   - Study Mode (spaced repetition)")
     print("   - Section Navigator")
     print("\n" + "="*70 + "\n")
+
+    # Setup PWA on startup
+    app.on_startup(setup_pwa)
 
     ui.run(
         port=config.PORT,
