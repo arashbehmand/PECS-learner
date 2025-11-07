@@ -1,9 +1,19 @@
-streamlit>=1.32.0
+# UI Framework
+nicegui>=1.4.0
+
+# Backend & Data
 langchain>=0.1.0
 python-dotenv>=1.0.0
 openai>=1.12.0
 sqlalchemy>=2.0.0
 pyyaml>=6.0.0
+
+# File conversion
+markitdown>=0.0.1a9
+
+# Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
-markitdown>=0.0.1a9 
+
+# Legacy (for backward compatibility during migration)
+streamlit>=1.32.0 

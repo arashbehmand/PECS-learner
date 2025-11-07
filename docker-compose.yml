@@ -3,21 +3,28 @@ version: '3.8'
 services:
   pecs-app:
     build: .
+    container_name: pecs-learning-nicegui
     ports:
-      - "8501:8501"
+      - "8080:8080"
     volumes:
       # Persist SQLite database outside container
       - ./data:/app/data
+      # Mount .env for API keys (optional)
+      - ./.env:/app/.env:ro
       # Mount code for development (optional - remove in production)
       # - .:/app
     environment:
-      - STREAMLIT_SERVER_PORT=8501
-      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - HOST=0.0.0.0
+      - PORT=8080
+      - PYTHONUNBUFFERED=1
+      - NICEGUI_STORAGE_PATH=/app/data/nicegui_storage
+      # Add your OpenAI API key here or use .env file
+      # - OPENAI_API_KEY=your-key-here
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 5s
+      start_period: 10s
 

@@ -1,10 +1,18 @@
 # P.E.C.S. Learning System 📚
 
-A production-grade, database-backed learning application that guides users through a structured learning methodology (Prime, Engage, Challenge, Solidify) for any text material—from articles to entire books.
+A production-grade, PWA-enabled learning application that guides users through a structured learning methodology (Prime, Engage, Challenge, Solidify) for any text material—from articles to entire books.
 
-![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
-![Streamlit](https://img.shields.io/badge/streamlit-1.32+-red.svg)
-![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0+-green.svg)
+**🎉 NEW: Complete migration to NiceGUI!**
+- ✅ Mobile-responsive PWA (installable on any device)
+- ✅ No page reloads - smooth, app-like experience
+- ✅ URL-based routing - bookmarkable links
+- ✅ Multi-user ready architecture
+- ✅ All Streamlit features preserved and enhanced
+
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![NiceGUI](https://img.shields.io/badge/NiceGUI-1.4+-green.svg)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0+-orange.svg)
+![PWA](https://img.shields.io/badge/PWA-Ready-purple.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 ## 🎯 Features
@@ -45,9 +53,10 @@ git clone <repository-url>
 cd PECS-learner
 
 # Start the application
-docker-compose up
+docker-compose up --build
 
-# Access at http://localhost:8501
+# Access at http://localhost:8080
+# Install as PWA: Click "Install" button in browser address bar
 ```
 
 ### Option 2: Local Installation
@@ -64,13 +73,24 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the application
+# Run the NiceGUI application
+python nicegui_app/main.py
+
+# Access at http://localhost:8080
+```
+
+### Option 3: Legacy Streamlit Version
+
+The original Streamlit version is still available for compatibility:
+
+```bash
 streamlit run app.py
+# Access at http://localhost:8501
 ```
 
 ## 📋 Requirements
 
-- Python 3.10+
+- Python 3.11+
 - SQLite 3 (included with Python)
 - Optional: OpenAI API key for AI features
 
@@ -78,16 +98,32 @@ streamlit run app.py
 
 ### API Keys (Optional)
 
-To enable AI features, create `.streamlit/secrets.toml`:
+To enable AI features, create `.env` file in the project root:
 
-```toml
-[llm]
-openai_api_key = "your-openai-api-key-here"
+```bash
+OPENAI_API_KEY=your-openai-api-key-here
 ```
 
 **Note**: The application works perfectly without API keys—AI features are optional enhancements.
 
 You can get an OpenAI API key from: https://platform.openai.com/api-keys
+
+### Environment Variables
+
+Create a `.env` file:
+
+```bash
+# Server configuration
+HOST=0.0.0.0
+PORT=8080
+RELOAD=false  # Set to true for development
+
+# AI Features (optional)
+OPENAI_API_KEY=your-key-here
+
+# Storage
+NICEGUI_STORAGE_PATH=./data/nicegui_storage
+```
 
 ## 📖 Usage Guide
 
@@ -190,13 +226,13 @@ docker build -t pecs-learner .
 
 ### Run Container
 ```bash
-docker run -p 8501:8501 -v $(pwd)/data:/app/data pecs-learner
+docker run -p 8080:8080 -v $(pwd)/data:/app/data pecs-learner
 ```
 
 ### Docker Compose
 ```bash
-# Start
-docker-compose up
+# Build and start
+docker-compose up --build
 
 # Start in background
 docker-compose up -d
@@ -209,6 +245,15 @@ docker-compose down
 ```
 
 **Important**: The `data/` directory is mounted as a volume to persist your database across container restarts.
+
+### Deploy to Cloud
+
+The app is ready to deploy to any cloud platform. See `DEPLOYMENT_GUIDE.md` for detailed instructions on deploying to:
+- Railway (easiest, free tier)
+- Render (free tier with sleep)
+- DigitalOcean App Platform ($5/month)
+- Google Cloud Run (pay-per-use)
+- Self-hosted VPS
 
 ## 🏗️ Architecture Highlights
 
@@ -245,10 +290,11 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 
 ## 🙏 Acknowledgments
 
-- Built with [Streamlit](https://streamlit.io/)
+- Built with [NiceGUI](https://nicegui.io/) (migrated from Streamlit)
 - Uses [SQLAlchemy](https://www.sqlalchemy.org/) for database operations
 - AI integration via [OpenAI](https://openai.com/)
 - Text processing with [LangChain](https://www.langchain.com/)
+- File conversion powered by [markitdown](https://github.com/microsoft/markitdown)
 
 ## 📚 Documentation
 
