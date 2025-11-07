@@ -17,3 +17,5 @@ pytest-cov>=4.1.0
 
 # Legacy (for backward compatibility during migration)
 streamlit>=1.32.0 
+
+markitdown[all]

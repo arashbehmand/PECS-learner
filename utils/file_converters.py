@@ -1,11 +1,10 @@
 """
 File format converters for EPUB and PDF files.
-Uses markitdown to convert various formats to markdown/text.
+Performs pure data conversion using markitdown when available.
 """
 import tempfile
 import os
 from typing import Optional
-import streamlit as st
 
 try:
     from markitdown import MarkItDown
@@ -14,72 +13,81 @@ except ImportError:
     MARKITDOWN_AVAILABLE = False
 
 
-def convert_file_to_text(uploaded_file) -> Optional[str]:
+def convert_file_to_text(uploaded_file) -> str:
     """
-    Convert uploaded file (EPUB, PDF, etc.) to text using markitdown.
-    
+    Convert uploaded file (file-like object or filesystem path) to plain text using markitdown.
+
     Args:
-        uploaded_file: Streamlit UploadedFile object
-        
+        uploaded_file: Either a path (str) to a file on disk or an object with
+                       attributes `name` and `getvalue()` returning bytes (e.g. uploaded file).
+
     Returns:
-        str: Converted text content, or None if conversion fails
+        str: Converted and stripped text content.
+
+    Raises:
+        ImportError: if markitdown is not installed.
+        ValueError: if the conversion produced no usable text.
+        Exception: any error raised by the underlying conversion library is propagated.
     """
     if not MARKITDOWN_AVAILABLE:
-        st.error("❌ markitdown library is not installed. Please install it with: `pip install markitdown`")
-        st.info("💡 After installation, restart the Streamlit app.")
-        return None
-    
+        raise ImportError("markitdown library is not installed. Install with: pip install markitdown")
+
+    owns_tmp = False
+    tmp_path = None
+
     try:
-        # Save uploaded file to temporary location
-        file_ext = os.path.splitext(uploaded_file.name)[1]
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
-            tmp_path = tmp_file.name
-        
-        try:
-            # Use markitdown to convert file
-            md = MarkItDown()
-            result = md.convert(tmp_path)
-            
-            # Extract text from result - markitdown returns different types
-            text_content = None
-            
-            if isinstance(result, str):
-                text_content = result
-            elif hasattr(result, 'text_content'):
-                text_content = result.text_content
-            elif hasattr(result, 'text'):
-                text_content = result.text
-            elif hasattr(result, 'markdown'):
-                text_content = result.markdown
-            elif hasattr(result, 'content'):
-                text_content = result.content
-            
-            if not text_content:
-                st.error("Could not extract text from file. The file format might not be supported.")
-                return None
-            
-            # Clean up any extra whitespace
-            text_content = text_content.strip()
-            
-            if not text_content:
-                st.warning("The converted file appears to be empty.")
-                return None
-                
-            return text_content
-                
-        finally:
-            # Clean up temporary file
+        # Accept either a path string or an uploaded-file-like object
+        if isinstance(uploaded_file, str):
+            tmp_path = uploaded_file
+        else:
+            # write uploaded bytes to a temporary file so markitdown can read it
+            file_ext = os.path.splitext(getattr(uploaded_file, "name", ""))[1] or ""
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
+                # uploaded_file.getvalue() should return bytes
+                content = uploaded_file.getvalue()
+                if isinstance(content, str):
+                    content = content.encode("utf-8")
+                tmp_file.write(content)
+                tmp_path = tmp_file.name
+            owns_tmp = True
+
+        # Use markitdown to convert the file to text/markdown
+        md = MarkItDown()
+        result = md.convert(tmp_path)
+
+        # Extract text from result - markitdown can return different shapes
+        text_content = None
+
+        if isinstance(result, str):
+            text_content = result
+        elif hasattr(result, "text_content"):
+            text_content = result.text_content
+        elif hasattr(result, "text"):
+            text_content = result.text
+        elif hasattr(result, "markdown"):
+            text_content = result.markdown
+        elif hasattr(result, "content"):
+            text_content = result.content
+
+        if text_content is None:
+            raise ValueError("Could not extract text from file. The file format might not be supported.")
+
+        # Normalize and return
+        text_content = text_content.strip()
+        if not text_content:
+            raise ValueError("Converted content is empty.")
+
+        return text_content
+
+    finally:
+        # Cleanup temporary file if we created one
+        if owns_tmp and tmp_path:
             try:
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
             except Exception:
+                # Best-effort cleanup; ignore failures
                 pass
-                
-    except Exception as e:
-        st.error(f"Error converting file: {str(e)}")
-        # Note: st.debug doesn't exist in Streamlit, using error message instead
-        return None
 
 
 def is_supported_file_type(filename: str) -> bool:

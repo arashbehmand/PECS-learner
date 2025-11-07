@@ -89,61 +89,81 @@ class ContentUploadPage:
                     ui.label('Supported: TXT, MD, EPUB, PDF, DOCX').classes('text-sm text-gray-500 mb-2')
 
                     async def handle_upload(e):
-                        """Handle file upload"""
-                        # In NiceGUI, upload events provide content differently
-                        # The content is bytes directly from the event
-                        filename = e.name
-
-                        # Read the uploaded content
+                        """Handle file upload (use e.file directly for filename & content)"""
+                        # Small diagnostic logs to validate event structure
+                        print(f"DEBUG: Upload event type: {type(e)}")
+                        print(f"DEBUG: Upload event attributes: {dir(e)}")
                         try:
-                            # NiceGUI provides content via the sender's read method
-                            uploaded_bytes = await e.sender.read()
-                        except AttributeError:
-                            # Fallback for different NiceGUI versions
-                            if hasattr(e, 'content'):
-                                uploaded_bytes = e.content
-                            else:
-                                ui.notify('Could not read uploaded file', color='negative', position='top')
-                                return
-
+                            print(f"DEBUG: Upload event sender type: {type(e.sender)}")
+                            print(f"DEBUG: Upload event sender attributes: {dir(e.sender)}")
+                        except Exception:
+                            pass
+                        
+                        # Prefer direct access to e.file (newer NiceGUI UploadEventArguments)
+                        if not hasattr(e, 'file') or e.file is None:
+                            print("DEBUG: Upload event missing 'file' attribute")
+                            ui.notify('Upload event missing file data', color='negative', position='top')
+                            return
+                        
+                        # Get filename from e.file.name
+                        try:
+                            filename = e.file.name
+                            print(f"DEBUG: filename from e.file.name: {filename}")
+                        except Exception as ex:
+                            print(f"DEBUG: Failed to get filename from e.file: {ex}")
+                            ui.notify('Could not determine uploaded filename', color='negative', position='top')
+                            return
+                        
+                        # Read content via e.file.read() (async)
+                        try:
+                            uploaded_bytes = await e.file.read()
+                            print(f"DEBUG: Read {len(uploaded_bytes) if uploaded_bytes else 0} bytes from e.file")
+                        except Exception as ex:
+                            print(f"DEBUG: Failed to read uploaded bytes from e.file: {ex}")
+                            ui.notify('Could not read uploaded file', color='negative', position='top')
+                            return
+                        
                         if not uploaded_bytes:
                             ui.notify('No file uploaded', color='warning', position='top')
                             return
-
+                        
                         file_ext = os.path.splitext(filename)[1].lower()
-
+                        
                         try:
                             if file_ext in ['.txt', '.md']:
                                 # Simple text file
-                                text_content['value'] = uploaded_bytes.decode('utf-8')
+                                if isinstance(uploaded_bytes, (bytes, bytearray)):
+                                    text_content['value'] = uploaded_bytes.decode('utf-8')
+                                else:
+                                    text_content['value'] = str(uploaded_bytes)
                                 ui.notify(f'Loaded {filename} ({len(text_content["value"])} characters)', color='positive', position='top')
-
+                        
                             elif file_ext in ['.epub', '.pdf', '.docx', '.doc']:
                                 # Complex format - use converter
                                 ui.notify(f'Converting {file_ext[1:].upper()} file...', position='top')
-
+                        
                                 # Create temp file for converter
                                 import tempfile
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
-                                    tmp.write(uploaded_bytes)
+                                    tmp.write(uploaded_bytes if isinstance(uploaded_bytes, (bytes, bytearray)) else str(uploaded_bytes).encode('utf-8'))
                                     tmp_path = tmp.name
-
+                        
                                 # Convert
                                 from utils.file_converters import convert_file_to_text
                                 converted_text = convert_file_to_text(tmp_path)
-
+                        
                                 # Cleanup
                                 os.unlink(tmp_path)
-
+                        
                                 if converted_text:
                                     text_content['value'] = converted_text
                                     ui.notify(f'Converted {filename} ({len(converted_text)} characters)', color='positive', position='top')
                                 else:
                                     ui.notify('Failed to convert file', color='negative', position='top')
-
+                        
                             else:
                                 ui.notify(f'Unsupported file type: {file_ext}', color='negative', position='top')
-
+                        
                         except Exception as ex:
                             ui.notify(f'Error reading file: {str(ex)}', color='negative', position='top')
 
