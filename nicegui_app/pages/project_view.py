@@ -32,7 +32,7 @@ class ProjectViewPage:
         if not self.project:
             with ui.column().classes('items-center mt-12'):
                 ui.label('Project not found').classes('text-xl text-red-500')
-                ui.button('� Back to Dashboard', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
+                ui.button('Back to Dashboard', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
             return
 
         # Header with project name and actions
@@ -77,13 +77,13 @@ class ProjectViewPage:
             # Action buttons
             with ui.row().classes('w-full gap-2 flex-wrap mt-4'):
                 ui.button(
-                    '=� Study Mode',
+                    'Study Mode',
                     icon='school',
                     on_click=lambda: ui.navigate.to(f'/project/{self.project_id}/study')
                 ).classes('bg-green-500 flex-1 min-w-40')
 
                 ui.button(
-                    '� Add Content',
+                    'Add Content',
                     icon='add',
                     on_click=lambda: ui.navigate.to(f'/project/{self.project_id}/upload')
                 ).classes('bg-blue-500 flex-1 min-w-40')
@@ -181,7 +181,7 @@ class ProjectViewPage:
                             ui.label(f'{phases_completed}/4 PECS phases').classes('text-xs text-blue-600')
 
                         if section.is_completed:
-                            ui.label(' Completed').classes('text-xs text-green-600 font-semibold')
+                            ui.label('Completed').classes('text-xs text-green-600 font-semibold')
 
                 # Open button
                 ui.button(

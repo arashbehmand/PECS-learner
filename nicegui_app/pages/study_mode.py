@@ -38,7 +38,7 @@ class StudyModePage:
 
         if not self.project:
             ui.label('Project not found').classes('text-xl text-red-500')
-            ui.button('� Back', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
+            ui.button('Back', on_click=lambda: ui.navigate.to('/')).classes('mt-4')
             return
 
         # Header
@@ -101,17 +101,17 @@ class StudyModePage:
                 # Navigation
                 with ui.row().classes('w-full gap-2 mt-6'):
                     ui.button(
-                        '� Previous',
+                        'Previous',
                         on_click=lambda: self._navigate('prev', render_study_session)
                     ).classes('flex-1').props('outline')
 
                     ui.button(
-                        '= Reset',
+                        'Reset',
                         on_click=lambda: self._navigate('reset', render_study_session)
                     ).classes('flex-1').props('outline')
 
                     ui.button(
-                        '� Next',
+                        'Next',
                         on_click=lambda: self._navigate('next', render_study_session)
                     ).classes('flex-1').props('outline')
 
@@ -140,7 +140,7 @@ class StudyModePage:
                     refresh_callback()
 
                 ui.button(
-                    '= Reveal Answer',
+                    'Reveal Answer',
                     icon='visibility',
                     on_click=reveal
                 ).classes('bg-blue-500 text-lg px-6 py-3 mt-4')
@@ -160,13 +160,13 @@ class StudyModePage:
                         self._review_card(card, True, refresh_callback)
 
                     ui.button(
-                        'L Forgot',
+                        'Forgot',
                         icon='close',
                         on_click=review_forgot
                     ).classes('flex-1 bg-red-500 text-lg py-3')
 
                     ui.button(
-                        ' Knew It',
+                        'Knew It',
                         icon='check',
                         on_click=review_knew
                     ).classes('flex-1 bg-green-500 text-lg py-3')
@@ -191,7 +191,7 @@ class StudyModePage:
             ui.label(f'No cards available for "{mode}"').classes('text-xl text-gray-500 text-center mt-4')
             ui.label('Create some flashcards in the Solidify phase').classes('text-gray-400 text-center')
             ui.button(
-                '� Back to Project',
+                'Back to Project',
                 on_click=lambda: ui.navigate.to(f'/project/{self.project_id}')
             ).classes('mt-4')
 
@@ -206,7 +206,7 @@ class StudyModePage:
 
         # Check if session complete
         if self.current_index >= len(self.study_cards):
-            ui.notify('<� Study session complete! Great work!', color='positive', position='top')
+            ui.notify('Study session complete! Great work!', color='positive', position='top')
             self.current_index = 0
 
         refresh_callback()
@@ -228,7 +228,7 @@ class StudyModePage:
         stats = self.db.get_project_stats(self.project_id)
 
         with ui.card().classes('w-full max-w-md mx-auto mt-6 p-4'):
-            ui.label('=� Study Statistics').classes('text-lg font-bold mb-3')
+            ui.label('Study Statistics').classes('text-lg font-bold mb-3')
 
             with ui.row().classes('w-full justify-around'):
                 with ui.column().classes('items-center'):

@@ -39,7 +39,7 @@ class PECSLearningPage:
 
         if not self.section:
             ui.label('Section not found').classes('text-xl text-red-500')
-            ui.button('� Back', on_click=lambda: ui.navigate.to(f'/project/{self.project_id}')).classes('mt-4')
+            ui.button('Back', on_click=lambda: ui.navigate.to(f'/project/{self.project_id}')).classes('mt-4')
             return
 
         # Header
@@ -83,9 +83,9 @@ class PECSLearningPage:
         ).classes('w-full mb-2').props('rows=4 autogrow')
 
         with ui.row().classes('gap-2 mb-4'):
-            ui.button('=� Save', on_click=lambda: self._save_prime('initial_thoughts', understanding_input.value)).classes('bg-blue-500')
+            ui.button('Save', on_click=lambda: self._save_prime('initial_thoughts', understanding_input.value)).classes('bg-blue-500')
             if self.llm_service.is_available():
-                ui.button('> Get AI Feedback', on_click=lambda: self._get_ai_feedback('section_understanding', understanding_input.value)).classes('bg-purple-500')
+                ui.button('Get AI Feedback', on_click=lambda: self._get_ai_feedback('section_understanding', understanding_input.value)).classes('bg-purple-500')
 
         # Prior knowledge
         ui.label('What do you already know about this topic?').classes('font-semibold mb-2 mt-4')
@@ -93,7 +93,7 @@ class PECSLearningPage:
             placeholder='Connect to prior knowledge...',
             value=pecs_data.get('prior_knowledge', '')
         ).classes('w-full mb-2').props('rows=3 autogrow')
-        ui.button('=� Save', on_click=lambda: self._save_prime('prior_knowledge', prior_input.value)).classes('bg-blue-500 mb-4')
+        ui.button('Save', on_click=lambda: self._save_prime('prior_knowledge', prior_input.value)).classes('bg-blue-500 mb-4')
 
         # Questions
         ui.label('What questions do you have?').classes('font-semibold mb-2 mt-4')
@@ -101,7 +101,7 @@ class PECSLearningPage:
             placeholder='What are you curious about?',
             value=pecs_data.get('questions', '')
         ).classes('w-full mb-2').props('rows=3 autogrow')
-        ui.button('=� Save', on_click=lambda: self._save_prime('questions', questions_input.value)).classes('bg-blue-500')
+        ui.button('Save', on_click=lambda: self._save_prime('questions', questions_input.value)).classes('bg-blue-500')
 
     def _render_engage_phase(self):
         """Engage & Explain phase"""
@@ -131,9 +131,9 @@ class PECSLearningPage:
         ).classes('w-full mb-2').props('rows=6 autogrow')
 
         with ui.row().classes('gap-2 mb-4'):
-            ui.button('=� Save', on_click=lambda: self._save_engage('explanation', explanation_input.value)).classes('bg-blue-500')
+            ui.button('Save', on_click=lambda: self._save_engage('explanation', explanation_input.value)).classes('bg-blue-500')
             if self.llm_service.is_available():
-                ui.button('> Get AI Feedback', on_click=lambda: self._get_ai_feedback('explanation', explanation_input.value)).classes('bg-purple-500')
+                ui.button('Get AI Feedback', on_click=lambda: self._get_ai_feedback('explanation', explanation_input.value)).classes('bg-purple-500')
 
         # Self-correction prompts
         with ui.card().classes('w-full bg-blue-50 p-4 mb-4'):
@@ -151,7 +151,7 @@ class PECSLearningPage:
             placeholder='This is like...',
             value=pecs_data.get('analogy', '')
         ).classes('w-full mb-2').props('rows=3 autogrow')
-        ui.button('=� Save', on_click=lambda: self._save_engage('analogy', analogy_input.value)).classes('bg-blue-500')
+        ui.button('Save', on_click=lambda: self._save_engage('analogy', analogy_input.value)).classes('bg-blue-500')
 
     def _render_challenge_phase(self):
         """Challenge & Connect phase"""
@@ -181,9 +181,9 @@ class PECSLearningPage:
         ).classes('w-full mb-2').props('rows=5 autogrow')
 
         with ui.row().classes('gap-2 mb-4'):
-            ui.button('=� Save', on_click=lambda: self._save_challenge('critical_questions', critical_input.value)).classes('bg-blue-500')
+            ui.button('Save', on_click=lambda: self._save_challenge('critical_questions', critical_input.value)).classes('bg-blue-500')
             if self.llm_service.is_available():
-                ui.button('> Get AI Feedback', on_click=lambda: self._get_ai_feedback('critical_thinking', critical_input.value)).classes('bg-purple-500')
+                ui.button('Get AI Feedback', on_click=lambda: self._get_ai_feedback('critical_thinking', critical_input.value)).classes('bg-purple-500')
 
         # Connections
         ui.label('Making Connections').classes('text-lg font-bold mb-2 mt-4')
@@ -199,7 +199,7 @@ class PECSLearningPage:
             placeholder='Connections to other topics/experiences...',
             value=pecs_data.get('connections', '')
         ).classes('w-full mb-2').props('rows=5 autogrow')
-        ui.button('=� Save', on_click=lambda: self._save_challenge('connections', connections_input.value)).classes('bg-blue-500')
+        ui.button('Save', on_click=lambda: self._save_challenge('connections', connections_input.value)).classes('bg-blue-500')
 
     def _render_solidify_phase(self):
         """Solidify & Space phase"""
@@ -225,7 +225,7 @@ class PECSLearningPage:
 
         # AI flashcard suggestions
         if self.llm_service.is_available():
-            if ui.button('( Get AI Flashcard Suggestions', icon='auto_awesome').classes('bg-purple-500 mb-4'):
+            if ui.button('Get AI Flashcard Suggestions', icon='auto_awesome').classes('bg-purple-500 mb-4'):
                 self._generate_ai_flashcards()
 
         # Add flashcard form
@@ -271,17 +271,17 @@ class PECSLearningPage:
             placeholder='Real-world applications...',
             value=solidify_data.get('application', '')
         ).classes('w-full mb-2').props('rows=3 autogrow')
-        ui.button('=� Save', on_click=lambda: self._save_solidify('application', application_input.value)).classes('bg-blue-500 mb-4')
+        ui.button('Save', on_click=lambda: self._save_solidify('application', application_input.value)).classes('bg-blue-500 mb-4')
 
         # Complete section button
         if not self.section.is_completed:
             ui.button(
-                ' Mark Section as Complete',
+                'Mark Section as Complete',
                 icon='check_circle',
                 on_click=self._mark_complete
             ).classes('bg-green-500 text-lg px-6 py-3 mt-4')
         else:
-            ui.label(' This section is completed!').classes('text-lg text-green-600 font-semibold mt-4')
+            ui.label('This section is completed!').classes('text-lg text-green-600 font-semibold mt-4')
 
     # Helper methods
     def _save_prime(self, field: str, value: str):
@@ -337,7 +337,7 @@ class PECSLearningPage:
 
             if feedback:
                 with ui.dialog() as feedback_dialog, ui.card().classes('max-w-2xl'):
-                    ui.label('> AI Feedback').classes('text-xl font-bold mb-3')
+                    ui.label('AI Feedback').classes('text-xl font-bold mb-3')
                     ui.markdown(feedback)
                     ui.button('Close', on_click=feedback_dialog.close).classes('mt-4')
                 feedback_dialog.open()
@@ -402,5 +402,5 @@ class PECSLearningPage:
     def _mark_complete(self):
         """Mark section as completed"""
         self.db.mark_section_completed(self.section_id, completed=True)
-        ui.notify('<� Section completed! Great work!', color='positive', position='top')
+        ui.notify('Section completed! Great work!', color='positive', position='top')
         ui.navigate.reload()
