@@ -90,19 +90,32 @@ class ContentUploadPage:
 
                     async def handle_upload(e):
                         """Handle file upload"""
-                        uploaded_file = e.content
+                        # In NiceGUI, upload events provide content differently
+                        # The content is bytes directly from the event
+                        filename = e.name
 
-                        if not uploaded_file:
+                        # Read the uploaded content
+                        try:
+                            # NiceGUI provides content via the sender's read method
+                            uploaded_bytes = await e.sender.read()
+                        except AttributeError:
+                            # Fallback for different NiceGUI versions
+                            if hasattr(e, 'content'):
+                                uploaded_bytes = e.content
+                            else:
+                                ui.notify('Could not read uploaded file', color='negative', position='top')
+                                return
+
+                        if not uploaded_bytes:
                             ui.notify('No file uploaded', color='warning', position='top')
                             return
 
-                        filename = e.name
                         file_ext = os.path.splitext(filename)[1].lower()
 
                         try:
                             if file_ext in ['.txt', '.md']:
                                 # Simple text file
-                                text_content['value'] = uploaded_file.read().decode('utf-8')
+                                text_content['value'] = uploaded_bytes.decode('utf-8')
                                 ui.notify(f'Loaded {filename} ({len(text_content["value"])} characters)', color='positive', position='top')
 
                             elif file_ext in ['.epub', '.pdf', '.docx', '.doc']:
@@ -112,7 +125,7 @@ class ContentUploadPage:
                                 # Create temp file for converter
                                 import tempfile
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
-                                    tmp.write(uploaded_file.read())
+                                    tmp.write(uploaded_bytes)
                                     tmp_path = tmp.name
 
                                 # Convert
