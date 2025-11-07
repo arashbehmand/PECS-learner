@@ -4,8 +4,13 @@ PECS Learning System - NiceGUI Main Application
 Complete migration from Streamlit to NiceGUI with PWA support
 """
 
-import json
+import sys
 from pathlib import Path
+
+# Add parent directory to path so we can import from utils/
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+import json
 from nicegui import ui, app
 from utils.database import DatabaseRepository
 from nicegui_app import config
@@ -177,31 +182,31 @@ def pecs_learning_page(project_id: int, section_id: int):
 # ===== MAIN ENTRY POINT =====
 if __name__ in {"__main__", "__mp_main__"}:
     print("\n" + "="*70)
-    print(f"=� {config.APP_NAME} v{config.APP_VERSION}")
+    print(f"{config.APP_NAME} v{config.APP_VERSION}")
     print("="*70)
-    print("\n=� Features:")
-    print("    Complete NiceGUI migration from Streamlit")
-    print("    Mobile-optimized responsive design")
-    print("    Progressive Web App (PWA) - installable")
-    print("    No page reloads - smooth UX")
-    print("    URL-based routing")
-    print("    Multi-user ready (auth scaffolding)")
-    print("\n< Access:")
-    print(f"   " Local: http://localhost:{config.PORT}")
-    print(f"   " Network: http://<your-ip>:{config.PORT}")
-    print("\n=� Components:")
-    print("    Project Dashboard")
-    print("    Content Upload (EPUB, PDF, DOCX support)")
-    print("    PECS Learning (4-phase system)")
-    print("    Study Mode (spaced repetition)")
-    print("    Section Navigator")
+    print("\nFeatures:")
+    print("   - Complete NiceGUI migration from Streamlit")
+    print("   - Mobile-optimized responsive design")
+    print("   - Progressive Web App (PWA) - installable")
+    print("   - No page reloads - smooth UX")
+    print("   - URL-based routing")
+    print("   - Multi-user ready (auth scaffolding)")
+    print("\nAccess:")
+    print(f"   Local: http://localhost:{config.PORT}")
+    print(f"   Network: http://<your-ip>:{config.PORT}")
+    print("\nComponents:")
+    print("   - Project Dashboard")
+    print("   - Content Upload (EPUB, PDF, DOCX support)")
+    print("   - PECS Learning (4-phase system)")
+    print("   - Study Mode (spaced repetition)")
+    print("   - Section Navigator")
     print("\n" + "="*70 + "\n")
 
     ui.run(
         port=config.PORT,
         host=config.HOST,
         title=config.APP_NAME,
-        favicon='=�',
+        favicon='📚',
         reload=config.RELOAD,
         show=False,  # Don't auto-open browser
     )
