@@ -1,0 +1,152 @@
+prime_module:
+  section_analysis:
+    system: "You are a helpful learning assistant analyzing a student's initial understanding of a text section."
+    user: |
+      Analyze the student's understanding of the following text section.
+      
+      Original Text:
+      {chunk_text}
+      
+      Student's Response:
+      {student_response}
+      
+      Provide feedback on:
+      1. How well they've captured the main points
+      2. Any important aspects they might have missed
+      3. Suggestions for what to focus on while reading
+      
+      Keep your response encouraging and constructive.
+
+  question_analysis:
+    system: "You are a helpful learning assistant analyzing a student's questions about a text section."
+    user: |
+      Review the student's questions about the following text section.
+      
+      Original Text:
+      {chunk_text}
+      
+      Student's Questions:
+      {student_questions}
+      
+      Provide feedback on:
+      1. The quality and relevance of their questions
+      2. Additional important questions they might consider
+      3. How these questions might guide their reading
+      
+      Keep your response encouraging and constructive.
+
+engage_module:
+  explanation_analysis:
+    system: "You are a helpful learning assistant analyzing a student's explanation of a text section."
+    user: |
+      Analyze the student's explanation of the following text section.
+      
+      Original Text:
+      {chunk_text}
+      
+      Student's Explanation:
+      {student_explanation}
+      
+      Provide feedback on:
+      1. Accuracy of the explanation
+      2. Clarity and organization
+      3. Use of examples or analogies
+      4. Areas that could be explained better
+      
+      Keep your response encouraging and constructive.
+
+  analogy_analysis:
+    system: "You are a helpful learning assistant analyzing a student's analogy for a concept."
+    user: |
+      Review the student's analogy for the following concept.
+      
+      Original Text:
+      {chunk_text}
+      
+      Student's Analogy:
+      {student_analogy}
+      
+      Provide feedback on:
+      1. Effectiveness of the analogy
+      2. Accuracy of the comparison
+      3. Suggestions for improvement
+      
+      Keep your response encouraging and constructive.
+
+challenge_module:
+  critical_analysis:
+    system: "You are a helpful learning assistant analyzing a student's critical thinking about a text section."
+    user: |
+      Review the student's critical analysis of the following text section.
+      
+      Original Text:
+      {chunk_text}
+      
+      Student's Critical Analysis:
+      {student_analysis}
+      
+      Provide feedback on:
+      1. Depth of critical thinking
+      2. Identification of assumptions
+      3. Quality of questions raised
+      4. Areas for deeper exploration
+      
+      Keep your response encouraging and constructive.
+
+  connection_analysis:
+    system: "You are a helpful learning assistant analyzing a student's connections between concepts."
+    user: |
+      Review the student's connections between the following text section and other concepts.
+      
+      Original Text:
+      {chunk_text}
+      
+      Student's Connections:
+      {student_connections}
+      
+      Provide feedback on:
+      1. Relevance of connections
+      2. Depth of understanding shown
+      3. Additional connections to consider
+      4. How these connections enhance understanding
+      
+      Keep your response encouraging and constructive.
+
+solidify_module:
+  flashcard_analysis:
+    system: "You are a helpful learning assistant analyzing a student's flashcards for a text section."
+    user: |
+      Review the student's flashcards for the following text section.
+      
+      Original Text:
+      {chunk_text}
+      
+      Student's Flashcards:
+      {student_flashcards}
+      
+      Provide feedback on:
+      1. Quality of questions
+      2. Completeness of answers
+      3. Coverage of key concepts
+      4. Suggestions for additional cards
+      
+      Keep your response encouraging and constructive.
+
+  application_analysis:
+    system: "You are a helpful learning assistant analyzing a student's application of concepts."
+    user: |
+      Review the student's application of concepts from the following text section.
+      
+      Original Text:
+      {chunk_text}
+      
+      Student's Application:
+      {student_application}
+      
+      Provide feedback on:
+      1. Practicality of applications
+      2. Depth of understanding shown
+      3. Additional applications to consider
+      4. How these applications reinforce learning
+      
+      Keep your response encouraging and constructive. 
