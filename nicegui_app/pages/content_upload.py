@@ -88,6 +88,13 @@ class ContentUploadPage:
                     ui.label('Upload a file:').classes('font-semibold mb-2')
                     ui.label('Supported: TXT, MD, EPUB, PDF, DOCX').classes('text-sm text-gray-500 mb-2')
 
+                    # Create textarea for displaying uploaded content
+                    uploaded_text_area = ui.textarea(
+                        label='Uploaded content (you can edit if needed)',
+                        placeholder='Upload a file to see its content here...'
+                    ).classes('w-full mt-4').props('rows=15')
+                    uploaded_text_area.visible = False  # Hidden until content is uploaded
+
                     async def handle_upload(e):
                         """Handle file upload (use e.file directly for filename & content)"""
                         # Small diagnostic logs to validate event structure
@@ -136,6 +143,8 @@ class ContentUploadPage:
                                     text_content['value'] = uploaded_bytes.decode('utf-8')
                                 else:
                                     text_content['value'] = str(uploaded_bytes)
+                                uploaded_text_area.value = text_content['value']
+                                uploaded_text_area.visible = True
                                 ui.notify(f'Loaded {filename} ({len(text_content["value"])} characters)', color='positive', position='top')
                         
                             elif file_ext in ['.epub', '.pdf', '.docx', '.doc']:
@@ -157,6 +166,8 @@ class ContentUploadPage:
                         
                                 if converted_text:
                                     text_content['value'] = converted_text
+                                    uploaded_text_area.value = converted_text
+                                    uploaded_text_area.visible = True
                                     ui.notify(f'Converted {filename} ({len(converted_text)} characters)', color='positive', position='top')
                                 else:
                                     ui.notify('Failed to convert file', color='negative', position='top')
@@ -166,6 +177,12 @@ class ContentUploadPage:
                         
                         except Exception as ex:
                             ui.notify(f'Error reading file: {str(ex)}', color='negative', position='top')
+
+                    # Update text_content when user edits the textarea
+                    def on_uploaded_text_change():
+                        text_content['value'] = uploaded_text_area.value or ''
+
+                    uploaded_text_area.on('update:modelValue', on_uploaded_text_change)
 
                     ui.upload(
                         on_upload=handle_upload,
