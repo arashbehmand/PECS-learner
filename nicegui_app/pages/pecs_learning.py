@@ -771,7 +771,7 @@ class PECSLearningPage:
         ui.navigate.reload()
 
     async def _continue_conversation(self, phase: str, feedback_type: str, user_input: str):
-        """Continue an existing AI conversation"""
+        """Continue an existing AI conversation with full context"""
         if not user_input:
             ui.notify('Please write a question or response first', color='warning', position='top')
             return
@@ -794,43 +794,39 @@ class PECSLearningPage:
             pecs_data = self.section.pecs_data.get(phase, {})
             conversation = pecs_data.get('ai_conversation', [])
 
-            # Build context from conversation history
-            context = "\n\n".join([
-                f"{'You' if msg['role'] == 'user' else 'AI'}: {msg['content']}"
+            # Build conversation history
+            conversation_history = "\n\n".join([
+                f"{'Student' if msg['role'] == 'user' else 'AI'}: {msg['content']}"
                 for msg in conversation
             ])
 
-            # Create a prompt that includes the conversation context
-            full_prompt = f"""Previous conversation:
-{context}
+            # Create system prompt based on phase
+            phase_context = {
+                'prime_preview': 'helping them understand their first impressions',
+                'engage_explain': 'helping them explain concepts in their own words',
+                'challenge_connect': 'helping them think critically and make connections'
+            }
+            context_desc = phase_context.get(phase, 'having a learning conversation')
 
-User's new question/response:
-{user_input}
+            # Build comprehensive prompt with full context
+            system_prompt = f"""You are a learning tutor {context_desc}.
+The student is studying this material:
 
-Please respond to the user's latest message, taking into account the previous conversation."""
+{self.section.content[:1000]}...
 
-            # Run LLM call in thread pool
+Previous conversation:
+{conversation_history}
+
+Now respond to their latest question/comment. Build on what you've already discussed.
+Be helpful and direct, not artificially enthusiastic."""
+
+            # Run LLM call directly with conversation context
             import asyncio
-            feedback = None
-
-            if feedback_type == 'section_understanding':
-                feedback = await asyncio.to_thread(
-                    self.llm_service.analyze_section_understanding,
-                    self.section.content,
-                    full_prompt
-                )
-            elif feedback_type == 'explanation':
-                feedback = await asyncio.to_thread(
-                    self.llm_service.analyze_explanation,
-                    self.section.content,
-                    full_prompt
-                )
-            elif feedback_type == 'critical_thinking':
-                feedback = await asyncio.to_thread(
-                    self.llm_service.analyze_critical_thinking,
-                    self.section.content,
-                    full_prompt
-                )
+            feedback = await asyncio.to_thread(
+                self.llm_service._make_llm_call,
+                system_prompt,
+                user_input
+            )
 
             dialog.close()
 
