@@ -843,21 +843,20 @@ Please respond to the user's latest message, taking into account the previous co
                     summary_text += f"  {msg['role']}: {msg['content'][:100]}...\n"
 
         # Create prompt for AI summary
-        prompt = f"""Review this learner's complete journey through a learning section.
-They used the PECS method (Prime, Engage, Challenge, Solidify).
+        prompt = f"""Review this learner's journey through a learning section using the PECS method.
 
-Here is everything they did:
+Here is what they did:
 
 {summary_text}
 
-Create a comprehensive, encouraging summary report that:
-1. Acknowledges their effort and engagement
-2. Highlights key insights they discovered
-3. Notes their strongest moments of understanding
-4. Summarizes what they learned
-5. Celebrates their completion
+Provide an objective summary that:
+1. Identifies the key concepts they engaged with
+2. Notes patterns in their thinking (questions they asked, connections they made)
+3. Points out any gaps or areas where understanding seems shallow
+4. Summarizes their progression through the material
+5. Suggests next steps if relevant
 
-Make it personal, warm, and satisfying - they just finished meaningful work!"""
+Be analytical and honest. Don't be overly enthusiastic or artificially encouraging. Write like a thoughtful reviewer, not a cheerleader."""
 
         # Show loading
         with ui.dialog() as dialog, ui.card().classes('max-w-3xl'):
@@ -891,10 +890,10 @@ Make it personal, warm, and satisfying - they just finished meaningful work!"""
 
                 # Show report in a nice dialog
                 with ui.dialog() as report_dialog, ui.card().classes('max-w-3xl'):
-                    ui.label('🎉 Section Complete!').classes('text-2xl font-bold mb-4 text-center')
+                    ui.label('Section Review').classes('text-2xl font-bold mb-4')
                     with ui.scroll_area().classes('w-full h-96'):
                         ui.markdown(report).classes('text-sm')
-                    ui.button('Awesome!', on_click=lambda: [report_dialog.close(), ui.navigate.reload()]).classes('bg-green-500 mt-4')
+                    ui.button('Close', on_click=lambda: [report_dialog.close(), ui.navigate.reload()]).classes('bg-blue-500 mt-4')
                 report_dialog.open()
             else:
                 ui.notify('Section completed!', color='positive', position='top')
