@@ -159,9 +159,22 @@ class PECSLearningPage:
                         ui.label('Your thoughts:').classes('font-semibold mt-2')
                         ui.label(phase_data['understanding']).classes('text-sm p-2 bg-white rounded')
 
-                    if phase_data.get('ai_feedback'):
-                        ui.label('AI Feedback:').classes('font-semibold mt-3')
-                        ui.markdown(phase_data['ai_feedback']).classes('text-sm p-3 bg-purple-50 rounded')
+                    # Show AI conversation if available
+                    ai_conversation = phase_data.get('ai_conversation', [])
+                    if ai_conversation:
+                        ui.label('AI Conversation:').classes('font-semibold mt-3')
+                        for msg in ai_conversation:
+                            if msg['role'] == 'user':
+                                ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-50 rounded mb-1')
+                            else:
+                                ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-purple-50 rounded mb-1')
+
+                    # Button to unmark as complete
+                    ui.button(
+                        'Unmark as Complete',
+                        icon='edit',
+                        on_click=lambda: self._uncomplete_phase('prime_preview')
+                    ).classes('bg-gray-500 mt-3')
 
             # Active input area
             else:
@@ -171,9 +184,12 @@ class PECSLearningPage:
                     value=phase_data.get('understanding', '')
                 ).classes('w-full').props('rows=4')
 
-                # Create async wrapper for AI feedback
+                # Create async wrappers
                 async def get_prime_feedback():
                     await self._get_ai_feedback('prime_preview', 'section_understanding', understanding_input.value)
+
+                async def complete_prime():
+                    await self._complete_phase('prime_preview')
 
                 with ui.row().classes('w-full gap-2 mt-3'):
                     ui.button(
@@ -192,14 +208,30 @@ class PECSLearningPage:
                         ui.button(
                             'Mark Complete',
                             icon='check',
-                            on_click=lambda: self._complete_phase('prime_preview')
+                            on_click=complete_prime
                         ).classes('bg-green-500')
 
-                # Show AI feedback if available
-                if phase_data.get('ai_feedback'):
+                # Show AI conversation if available
+                ai_conversation = phase_data.get('ai_conversation', [])
+                if ai_conversation:
                     with ui.card().classes('w-full mt-4 bg-purple-50'):
-                        ui.label('AI Feedback').classes('font-semibold mb-2')
-                        ui.markdown(phase_data['ai_feedback']).classes('text-sm')
+                        ui.label('AI Conversation').classes('font-semibold mb-2')
+                        with ui.column().classes('w-full gap-1 max-h-64 overflow-auto'):
+                            for msg in ai_conversation:
+                                if msg['role'] == 'user':
+                                    ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-100 rounded')
+                                else:
+                                    ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-white rounded')
+
+                        # Continue conversation button
+                        async def continue_prime_conversation():
+                            await self._continue_conversation('prime_preview', 'section_understanding', understanding_input.value)
+
+                        ui.button(
+                            'Continue Conversation',
+                            icon='chat',
+                            on_click=continue_prime_conversation
+                        ).classes('bg-purple-500 mt-2')
 
     def _render_engage_phase(self):
         """Phase 2: Engage & Explain - Deep understanding"""
@@ -256,9 +288,12 @@ class PECSLearningPage:
                     value=phase_data.get('explanation', '')
                 ).classes('w-full').props('rows=5')
 
-                # Create async wrapper for AI feedback
+                # Create async wrappers
                 async def get_engage_feedback():
                     await self._get_ai_feedback('engage_explain', 'explanation', explanation_input.value)
+
+                async def complete_engage():
+                    await self._complete_phase('engage_explain')
 
                 with ui.row().classes('w-full gap-2 mt-3'):
                     ui.button(
@@ -277,7 +312,7 @@ class PECSLearningPage:
                         ui.button(
                             'Mark Complete',
                             icon='check',
-                            on_click=lambda: self._complete_phase('engage_explain')
+                            on_click=complete_engage
                         ).classes('bg-green-500')
 
                 # Show AI feedback if available
@@ -341,9 +376,12 @@ class PECSLearningPage:
                     value=phase_data.get('critical_questions', '')
                 ).classes('w-full').props('rows=5')
 
-                # Create async wrapper for AI feedback
+                # Create async wrappers
                 async def get_challenge_feedback():
                     await self._get_ai_feedback('challenge_connect', 'critical_thinking', critical_input.value)
+
+                async def complete_challenge():
+                    await self._complete_phase('challenge_connect')
 
                 with ui.row().classes('w-full gap-2 mt-3'):
                     ui.button(
@@ -362,7 +400,7 @@ class PECSLearningPage:
                         ui.button(
                             'Mark Complete',
                             icon='check',
-                            on_click=lambda: self._complete_phase('challenge_connect')
+                            on_click=complete_challenge
                         ).classes('bg-green-500')
 
                 # Show AI feedback if available
@@ -450,10 +488,13 @@ class PECSLearningPage:
 
             # Mark complete button
             if flashcards:
+                async def complete_solidify():
+                    await self._complete_phase('solidify_space')
+
                 ui.button(
                     'Mark Section Complete',
                     icon='check_circle',
-                    on_click=lambda: self._complete_phase('solidify_space')
+                    on_click=complete_solidify
                 ).classes('bg-green-500 mt-4')
 
     def _save_phase_data(self, phase: str, field: str, value: str):
@@ -514,9 +555,26 @@ class PECSLearningPage:
             dialog.close()
 
             if feedback:
-                # Save feedback to database permanently
+                # Save as conversation (not single feedback)
+                from datetime import datetime
                 pecs_data = self.section.pecs_data.get(phase, {})
-                pecs_data['ai_feedback'] = feedback
+
+                # Initialize conversation if needed
+                if 'ai_conversation' not in pecs_data:
+                    pecs_data['ai_conversation'] = []
+
+                # Add user message and AI response
+                pecs_data['ai_conversation'].append({
+                    'role': 'user',
+                    'content': user_input,
+                    'timestamp': datetime.now().isoformat()
+                })
+                pecs_data['ai_conversation'].append({
+                    'role': 'assistant',
+                    'content': feedback,
+                    'timestamp': datetime.now().isoformat()
+                })
+
                 self.db.update_section_pecs_data(self.section_id, phase, pecs_data)
 
                 # Refresh section data
@@ -531,7 +589,7 @@ class PECSLearningPage:
             dialog.close()
             ui.notify(f'Error: {str(e)}', color='negative', position='top')
 
-    def _complete_phase(self, phase: str):
+    async def _complete_phase(self, phase: str):
         """Mark a phase as completed"""
         pecs_data = self.section.pecs_data.get(phase, {})
         pecs_data['completed'] = True
@@ -540,8 +598,13 @@ class PECSLearningPage:
         # Refresh section data
         self.section = self.db.get_section(self.section_id)
 
-        ui.notify('Phase completed!', color='positive', position='top')
-        ui.navigate.reload()
+        # If this is the solidify phase (last phase), generate completion report
+        if phase == 'solidify_space' and self.llm_service.is_available():
+            ui.notify('Generating your learning summary...', color='info', position='top')
+            await self._generate_completion_report()
+        else:
+            ui.notify('Phase completed!', color='positive', position='top')
+            ui.navigate.reload()
 
     def _add_flashcard(self, question_input, answer_input):
         """Add a flashcard"""
@@ -636,3 +699,208 @@ class PECSLearningPage:
         self.db.delete_flashcard(flashcard_id)
         ui.notify('Flashcard deleted', color='positive', position='top')
         ui.navigate.reload()
+
+    def _uncomplete_phase(self, phase: str):
+        """Unmark a phase as completed"""
+        pecs_data = self.section.pecs_data.get(phase, {})
+        pecs_data['completed'] = False
+        self.db.update_section_pecs_data(self.section_id, phase, pecs_data)
+
+        # Refresh section data
+        self.section = self.db.get_section(self.section_id)
+
+        ui.notify('Phase unmarked as complete', color='positive', position='top')
+        ui.navigate.reload()
+
+    async def _continue_conversation(self, phase: str, feedback_type: str, user_input: str):
+        """Continue an existing AI conversation"""
+        if not user_input:
+            ui.notify('Please write a question or response first', color='warning', position='top')
+            return
+
+        # Check if LLM service is available
+        if not self.llm_service.is_available():
+            ui.notify('AI features require an OpenAI API key. Set OPENAI_API_KEY environment variable.',
+                     color='warning', position='top')
+            return
+
+        # Create loading dialog
+        with ui.dialog() as dialog, ui.card().classes('max-w-2xl'):
+            ui.label('AI is thinking...').classes('text-lg font-bold')
+            ui.spinner(size='lg')
+
+        dialog.open()
+
+        try:
+            # Get conversation history for context
+            pecs_data = self.section.pecs_data.get(phase, {})
+            conversation = pecs_data.get('ai_conversation', [])
+
+            # Build context from conversation history
+            context = "\n\n".join([
+                f"{'You' if msg['role'] == 'user' else 'AI'}: {msg['content']}"
+                for msg in conversation
+            ])
+
+            # Create a prompt that includes the conversation context
+            full_prompt = f"""Previous conversation:
+{context}
+
+User's new question/response:
+{user_input}
+
+Please respond to the user's latest message, taking into account the previous conversation."""
+
+            # Run LLM call in thread pool
+            import asyncio
+            feedback = None
+
+            if feedback_type == 'section_understanding':
+                feedback = await asyncio.to_thread(
+                    self.llm_service.analyze_section_understanding,
+                    self.section.content,
+                    full_prompt
+                )
+            elif feedback_type == 'explanation':
+                feedback = await asyncio.to_thread(
+                    self.llm_service.analyze_explanation,
+                    self.section.content,
+                    full_prompt
+                )
+            elif feedback_type == 'critical_thinking':
+                feedback = await asyncio.to_thread(
+                    self.llm_service.analyze_critical_thinking,
+                    self.section.content,
+                    full_prompt
+                )
+
+            dialog.close()
+
+            if feedback:
+                # Add to conversation
+                from datetime import datetime
+                pecs_data = self.section.pecs_data.get(phase, {})
+
+                if 'ai_conversation' not in pecs_data:
+                    pecs_data['ai_conversation'] = []
+
+                pecs_data['ai_conversation'].append({
+                    'role': 'user',
+                    'content': user_input,
+                    'timestamp': datetime.now().isoformat()
+                })
+                pecs_data['ai_conversation'].append({
+                    'role': 'assistant',
+                    'content': feedback,
+                    'timestamp': datetime.now().isoformat()
+                })
+
+                self.db.update_section_pecs_data(self.section_id, phase, pecs_data)
+
+                # Refresh section data
+                self.section = self.db.get_section(self.section_id)
+
+                ui.notify('Conversation continued!', color='positive', position='top')
+                ui.navigate.reload()
+            else:
+                ui.notify('Could not generate response', color='warning', position='top')
+
+        except Exception as e:
+            dialog.close()
+            ui.notify(f'Error: {str(e)}', color='negative', position='top')
+
+    async def _generate_completion_report(self):
+        """Generate AI summary of the learner's journey through this section"""
+        # Gather all phase data
+        all_pecs_data = self.section.pecs_data or {}
+
+        # Build comprehensive summary of learner's work
+        summary_text = f"Section: {self.section.title or 'Untitled'}\n\n"
+        summary_text += f"Content:\n{self.section.content[:500]}...\n\n"
+
+        for phase_key, phase_name in [
+            ('prime_preview', 'Prime & Preview'),
+            ('engage_explain', 'Engage & Explain'),
+            ('challenge_connect', 'Challenge & Connect'),
+            ('solidify_space', 'Solidify & Space')
+        ]:
+            phase_data = all_pecs_data.get(phase_key, {})
+            summary_text += f"\n=== {phase_name} ===\n"
+
+            # Add user inputs
+            if phase_key == 'prime_preview' and phase_data.get('understanding'):
+                summary_text += f"First impressions: {phase_data['understanding']}\n"
+            elif phase_key == 'engage_explain' and phase_data.get('explanation'):
+                summary_text += f"Explanation: {phase_data['explanation']}\n"
+            elif phase_key == 'challenge_connect' and phase_data.get('critical_questions'):
+                summary_text += f"Questions & connections: {phase_data['critical_questions']}\n"
+
+            # Add conversation snippets
+            conversation = phase_data.get('ai_conversation', [])
+            if conversation:
+                summary_text += f"Conversation ({len(conversation)//2} exchanges):\n"
+                for msg in conversation[-4:]:  # Last 2 exchanges
+                    summary_text += f"  {msg['role']}: {msg['content'][:100]}...\n"
+
+        # Create prompt for AI summary
+        prompt = f"""Review this learner's complete journey through a learning section.
+They used the PECS method (Prime, Engage, Challenge, Solidify).
+
+Here is everything they did:
+
+{summary_text}
+
+Create a comprehensive, encouraging summary report that:
+1. Acknowledges their effort and engagement
+2. Highlights key insights they discovered
+3. Notes their strongest moments of understanding
+4. Summarizes what they learned
+5. Celebrates their completion
+
+Make it personal, warm, and satisfying - they just finished meaningful work!"""
+
+        # Show loading
+        with ui.dialog() as dialog, ui.card().classes('max-w-3xl'):
+            ui.label('Creating your learning summary...').classes('text-lg font-bold')
+            ui.spinner(size='lg')
+
+        dialog.open()
+
+        try:
+            import asyncio
+
+            # Generate report
+            report = await asyncio.to_thread(
+                self.llm_service.analyze_section_understanding,
+                "",  # No specific content needed
+                prompt
+            )
+
+            dialog.close()
+
+            if report:
+                # Save report to section
+                section_pecs_data = self.section.pecs_data or {}
+                section_pecs_data['completion_report'] = report
+                from datetime import datetime
+                section_pecs_data['completed_at'] = datetime.now().isoformat()
+
+                # Need to store the entire updated pecs_data back
+                self.section.pecs_data = section_pecs_data
+                self.db.update_section_pecs_data(self.section_id, 'solidify_space', self.section.pecs_data['solidify_space'])
+
+                # Show report in a nice dialog
+                with ui.dialog() as report_dialog, ui.card().classes('max-w-3xl'):
+                    ui.label('🎉 Section Complete!').classes('text-2xl font-bold mb-4 text-center')
+                    with ui.scroll_area().classes('w-full h-96'):
+                        ui.markdown(report).classes('text-sm')
+                    ui.button('Awesome!', on_click=lambda: [report_dialog.close(), ui.navigate.reload()]).classes('bg-green-500 mt-4')
+                report_dialog.open()
+            else:
+                ui.notify('Section completed!', color='positive', position='top')
+                ui.navigate.reload()
+
+        except Exception as e:
+            dialog.close()
+            ui.notify(f'Section completed! (Report generation failed: {str(e)})', color='positive', position='top')
+            ui.navigate.reload()
