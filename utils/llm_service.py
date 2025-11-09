@@ -1,6 +1,7 @@
 import os
 import json
 import yaml
+import re
 from typing import Optional, Dict, Any, List
 import logging
 from openai import OpenAI
@@ -8,6 +9,30 @@ from openai.types.chat import ChatCompletion
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+# Try to import Langfuse (optional)
+try:
+    from langfuse.openai import OpenAI as LangfuseOpenAI
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    LANGFUSE_AVAILABLE = False
+    logger.info("Langfuse not available. Install 'langfuse' for LLM observability.")
+
+def extract_json_from_markdown(content: str) -> str:
+    """Extract JSON from markdown code blocks if present, otherwise return as-is."""
+    # Try to find JSON in markdown code blocks (```json ... ``` or ``` ... ```)
+    patterns = [
+        r'```json\s*\n(.*?)\n```',  # ```json ... ```
+        r'```\s*\n(.*?)\n```',       # ``` ... ```
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, content, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+
+    # If no code block found, return original content
+    return content.strip()
 
 class LLMService:
     def __init__(self):
@@ -34,8 +59,31 @@ class LLMService:
 
             # Initialize client if we have an API key
             if self.api_key:
-                self.client = OpenAI(api_key=self.api_key)
-                logger.info("LLM service initialized successfully")
+                # Try to use Langfuse for observability if available and configured
+                if LANGFUSE_AVAILABLE:
+                    langfuse_public_key = os.getenv('LANGFUSE_PUBLIC_KEY')
+                    langfuse_secret_key = os.getenv('LANGFUSE_SECRET_KEY')
+                    langfuse_host = os.getenv('LANGFUSE_HOST', 'https://cloud.langfuse.com')
+
+                    if langfuse_public_key and langfuse_secret_key:
+                        try:
+                            self.client = LangfuseOpenAI(
+                                api_key=self.api_key,
+                                langfuse_public_key=langfuse_public_key,
+                                langfuse_secret_key=langfuse_secret_key,
+                                langfuse_host=langfuse_host
+                            )
+                            logger.info("LLM service initialized with Langfuse observability")
+                        except Exception as e:
+                            logger.warning(f"Failed to initialize Langfuse: {e}. Falling back to standard OpenAI client.")
+                            self.client = OpenAI(api_key=self.api_key)
+                            logger.info("LLM service initialized without observability")
+                    else:
+                        self.client = OpenAI(api_key=self.api_key)
+                        logger.info("LLM service initialized without observability (set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY for tracking)")
+                else:
+                    self.client = OpenAI(api_key=self.api_key)
+                    logger.info("LLM service initialized without observability")
             else:
                 self.client = None
                 logger.warning("No OpenAI API key found. LLM features will be unavailable.")
@@ -224,12 +272,22 @@ class LLMService:
             )
             
             content = response.choices[0].message.content
+            logger.debug(f"Raw LLM response: {content}")
+
+            # Extract JSON from potential markdown wrapper
+            json_str = extract_json_from_markdown(content)
+            logger.debug(f"Extracted JSON: {json_str}")
+
             try:
-                qa_pairs = json.loads(content)
+                qa_pairs = json.loads(json_str)
                 if isinstance(qa_pairs, list):
                     return qa_pairs[:3]  # Return at most 3 pairs
-            except json.JSONDecodeError:
-                logger.error("Failed to parse flashcard suggestions as JSON")
+                else:
+                    logger.error(f"Flashcard response is not a list: {type(qa_pairs)}")
+                    return None
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse flashcard suggestions as JSON: {e}")
+                logger.error(f"Attempted to parse: {json_str[:200]}")
                 return None
 
         except Exception as e:

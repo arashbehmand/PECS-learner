@@ -121,9 +121,31 @@ RELOAD=false  # Set to true for development
 # AI Features (optional)
 OPENAI_API_KEY=your-key-here
 
+# LLM Observability (optional - for tracking AI usage and costs)
+LANGFUSE_PUBLIC_KEY=your-langfuse-public-key
+LANGFUSE_SECRET_KEY=your-langfuse-secret-key
+LANGFUSE_HOST=https://cloud.langfuse.com  # or your self-hosted instance
+
 # Storage
 NICEGUI_STORAGE_PATH=./data/nicegui_storage
 ```
+
+**Langfuse Setup (Optional)**
+
+[Langfuse](https://langfuse.com/) provides observability for LLM calls - tracking usage, costs, latency, and quality:
+
+1. Sign up for free at https://cloud.langfuse.com (or self-host)
+2. Create a new project
+3. Copy your Public Key and Secret Key from the project settings
+4. Add them to your `.env` file
+5. All LLM calls will now be automatically tracked in Langfuse dashboard
+
+Benefits:
+- Track token usage and costs across all AI features
+- Debug LLM responses and failures
+- Monitor performance and latency
+- Analyze conversation quality
+- View detailed traces of all AI interactions
 
 ## 📖 Usage Guide
 
