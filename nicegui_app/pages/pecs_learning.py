@@ -276,9 +276,22 @@ class PECSLearningPage:
                         ui.label('Your explanation:').classes('font-semibold mt-2')
                         ui.label(phase_data['explanation']).classes('text-sm p-2 bg-white rounded')
 
-                    if phase_data.get('ai_feedback'):
-                        ui.label('AI Feedback:').classes('font-semibold mt-3')
-                        ui.markdown(phase_data['ai_feedback']).classes('text-sm p-3 bg-purple-50 rounded')
+                    # Show AI conversation if available
+                    ai_conversation = phase_data.get('ai_conversation', [])
+                    if ai_conversation:
+                        ui.label('AI Conversation:').classes('font-semibold mt-3')
+                        for msg in ai_conversation:
+                            if msg['role'] == 'user':
+                                ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-50 rounded mb-1')
+                            else:
+                                ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-purple-50 rounded mb-1')
+
+                    # Button to unmark as complete
+                    ui.button(
+                        'Unmark as Complete',
+                        icon='edit',
+                        on_click=lambda: self._uncomplete_phase('engage_explain')
+                    ).classes('bg-gray-500 mt-3')
 
             # Active input area
             else:
@@ -315,11 +328,27 @@ class PECSLearningPage:
                             on_click=complete_engage
                         ).classes('bg-green-500')
 
-                # Show AI feedback if available
-                if phase_data.get('ai_feedback'):
+                # Show AI conversation if available
+                ai_conversation = phase_data.get('ai_conversation', [])
+                if ai_conversation:
                     with ui.card().classes('w-full mt-4 bg-purple-50'):
-                        ui.label('AI Feedback').classes('font-semibold mb-2')
-                        ui.markdown(phase_data['ai_feedback']).classes('text-sm')
+                        ui.label('AI Conversation').classes('font-semibold mb-2')
+                        with ui.column().classes('w-full gap-1 max-h-64 overflow-auto'):
+                            for msg in ai_conversation:
+                                if msg['role'] == 'user':
+                                    ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-100 rounded')
+                                else:
+                                    ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-white rounded')
+
+                        # Continue conversation button
+                        async def continue_engage_conversation():
+                            await self._continue_conversation('engage_explain', 'explanation', explanation_input.value)
+
+                        ui.button(
+                            'Continue Conversation',
+                            icon='chat',
+                            on_click=continue_engage_conversation
+                        ).classes('bg-purple-500 mt-2')
 
     def _render_challenge_phase(self):
         """Phase 3: Challenge & Connect - Critical thinking"""
@@ -364,9 +393,22 @@ class PECSLearningPage:
                         ui.label('Your questions & connections:').classes('font-semibold mt-2')
                         ui.label(phase_data['critical_questions']).classes('text-sm p-2 bg-white rounded')
 
-                    if phase_data.get('ai_feedback'):
-                        ui.label('AI Feedback:').classes('font-semibold mt-3')
-                        ui.markdown(phase_data['ai_feedback']).classes('text-sm p-3 bg-purple-50 rounded')
+                    # Show AI conversation if available
+                    ai_conversation = phase_data.get('ai_conversation', [])
+                    if ai_conversation:
+                        ui.label('AI Conversation:').classes('font-semibold mt-3')
+                        for msg in ai_conversation:
+                            if msg['role'] == 'user':
+                                ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-50 rounded mb-1')
+                            else:
+                                ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-purple-50 rounded mb-1')
+
+                    # Button to unmark as complete
+                    ui.button(
+                        'Unmark as Complete',
+                        icon='edit',
+                        on_click=lambda: self._uncomplete_phase('challenge_connect')
+                    ).classes('bg-gray-500 mt-3')
 
             # Active input area
             else:
@@ -403,11 +445,27 @@ class PECSLearningPage:
                             on_click=complete_challenge
                         ).classes('bg-green-500')
 
-                # Show AI feedback if available
-                if phase_data.get('ai_feedback'):
+                # Show AI conversation if available
+                ai_conversation = phase_data.get('ai_conversation', [])
+                if ai_conversation:
                     with ui.card().classes('w-full mt-4 bg-purple-50'):
-                        ui.label('AI Feedback').classes('font-semibold mb-2')
-                        ui.markdown(phase_data['ai_feedback']).classes('text-sm')
+                        ui.label('AI Conversation').classes('font-semibold mb-2')
+                        with ui.column().classes('w-full gap-1 max-h-64 overflow-auto'):
+                            for msg in ai_conversation:
+                                if msg['role'] == 'user':
+                                    ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-100 rounded')
+                                else:
+                                    ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-white rounded')
+
+                        # Continue conversation button
+                        async def continue_challenge_conversation():
+                            await self._continue_conversation('challenge_connect', 'critical_thinking', critical_input.value)
+
+                        ui.button(
+                            'Continue Conversation',
+                            icon='chat',
+                            on_click=continue_challenge_conversation
+                        ).classes('bg-purple-500 mt-2')
 
     def _render_solidify_phase(self):
         """Phase 4: Solidify & Space - Create flashcards"""
@@ -446,7 +504,7 @@ class PECSLearningPage:
             ui.label('Create Flashcards - Turn key concepts into spaced repetition cards').classes('text-sm text-gray-600 mb-4')
 
             # Flashcard management
-            flashcards = self.db.get_flashcards_by_section(self.section_id)
+            flashcards = self.db.get_flashcards_by_project(self.section.project_id, self.section_id)
 
             if flashcards:
                 ui.label(f'Your Flashcards ({len(flashcards)})').classes('font-semibold mb-3')
