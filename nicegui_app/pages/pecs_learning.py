@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-PECS Learning Page - 4-phase learning interface
-Migrated from components/pecs_tabs.py (450 lines)
+PECS Learning Page - Guided vertical learning flow
+Redesigned for natural learning progression
 """
 
 from nicegui import ui
@@ -11,7 +11,7 @@ from utils.models import Section
 
 
 class PECSLearningPage:
-    """PECS 4-phase learning interface: Prime, Engage, Challenge, Solidify"""
+    """PECS 4-phase guided learning flow: Prime → Engage → Challenge → Solidify"""
 
     def __init__(self, db: DatabaseRepository, project_id: int, section_id: int, user_id: int = None):
         """
@@ -32,10 +32,15 @@ class PECSLearningPage:
 
         # Initialize PECS data if needed
         if self.section and not self.section.pecs_data:
-            self.section.pecs_data = {}
+            self.section.pecs_data = {
+                'prime_preview': {},
+                'engage_explain': {},
+                'challenge_connect': {},
+                'solidify_space': {}
+            }
 
     def render(self):
-        """Render PECS learning interface"""
+        """Render guided learning flow"""
 
         if not self.section:
             ui.label('Section not found').classes('text-xl text-red-500')
@@ -48,274 +53,413 @@ class PECSLearningPage:
             section_title = self.section.title or f'Section {self.section.order_index + 1}'
             ui.label(section_title).classes('text-lg md:text-2xl font-bold flex-1')
 
-        # Tabs for 4 phases
-        with ui.tabs().classes('w-full') as tabs:
-            prime_tab = ui.tab('P - Prime', icon='visibility')
-            engage_tab = ui.tab('E - Engage', icon='edit_note')
-            challenge_tab = ui.tab('C - Challenge', icon='psychology')
-            solidify_tab = ui.tab('S - Solidify', icon='workspace_premium')
+        # Progress indicator
+        self._render_progress_indicator()
 
-        with ui.tab_panels(tabs, value=prime_tab).classes('w-full mt-4'):
-            with ui.tab_panel(prime_tab):
-                self._render_prime_phase()
-            with ui.tab_panel(engage_tab):
-                self._render_engage_phase()
-            with ui.tab_panel(challenge_tab):
-                self._render_challenge_phase()
-            with ui.tab_panel(solidify_tab):
-                self._render_solidify_phase()
+        # Content section (always visible)
+        with ui.card().classes('w-full mb-4 bg-gray-50'):
+            ui.label('Learning Material').classes('text-xl font-bold mb-3')
+            with ui.scroll_area().classes('w-full h-64'):
+                ui.markdown(self.section.content or 'No content available').classes('text-sm')
+
+        # Vertical learning flow
+        with ui.column().classes('w-full gap-4'):
+            self._render_prime_phase()
+            self._render_engage_phase()
+            self._render_challenge_phase()
+            self._render_solidify_phase()
+
+    def _render_progress_indicator(self):
+        """Render progress bar showing current phase"""
+        phases = ['Prime', 'Engage', 'Challenge', 'Solidify']
+        current_phase = self._get_current_phase()
+
+        with ui.row().classes('w-full items-center gap-2 mb-4 p-4 bg-blue-50 rounded'):
+            ui.label('Progress:').classes('font-semibold')
+            for i, phase in enumerate(phases):
+                if i > 0:
+                    # Arrow between phases
+                    if i <= current_phase:
+                        ui.label('▶').classes('text-blue-500')
+                    else:
+                        ui.label('→').classes('text-gray-300')
+
+                # Phase name
+                if i < current_phase:
+                    ui.label(f'✓ {phase}').classes('text-green-600 font-semibold')
+                elif i == current_phase:
+                    ui.label(f'▶ {phase}').classes('text-blue-600 font-bold')
+                else:
+                    ui.label(phase).classes('text-gray-400')
+
+    def _get_current_phase(self) -> int:
+        """Get current phase index (0-3)"""
+        pecs_data = self.section.pecs_data or {}
+
+        # Check completion status of each phase
+        if not pecs_data.get('prime_preview', {}).get('completed'):
+            return 0
+        elif not pecs_data.get('engage_explain', {}).get('completed'):
+            return 1
+        elif not pecs_data.get('challenge_connect', {}).get('completed'):
+            return 2
+        elif not pecs_data.get('solidify_space', {}).get('completed'):
+            return 3
+        else:
+            return 3  # All complete
+
+    def _is_phase_unlocked(self, phase_index: int) -> bool:
+        """Check if a phase is unlocked"""
+        if phase_index == 0:
+            return True  # Prime is always unlocked
+
+        # Check if previous phase is completed
+        pecs_data = self.section.pecs_data or {}
+        phases = ['prime_preview', 'engage_explain', 'challenge_connect', 'solidify_space']
+
+        if phase_index > 0:
+            previous_phase = phases[phase_index - 1]
+            return pecs_data.get(previous_phase, {}).get('completed', False)
+
+        return True
 
     def _render_prime_phase(self):
-        """Prime & Preview phase"""
-        ui.markdown('**Take a moment to skim through this section and prepare for deeper reading.**').classes('mb-4')
+        """Phase 1: Prime & Preview - First impressions"""
+        phase_data = self.section.pecs_data.get('prime_preview', {})
+        is_completed = phase_data.get('completed', False)
+        current_phase = self._get_current_phase()
 
-        pecs_data = self.section.pecs_data.get('prime_preview', {})
+        # Phase card
+        card_classes = 'w-full p-6 '
+        if is_completed:
+            card_classes += 'bg-green-50 border-l-4 border-green-500'
+        elif current_phase == 0:
+            card_classes += 'bg-blue-50 border-l-4 border-blue-500'
+        else:
+            card_classes += 'bg-gray-100'
 
-        # Content (collapsible)
-        with ui.expansion('View Section Content', icon='book').classes('w-full bg-gray-50 mb-4'):
-            ui.markdown(self.section.content)
+        with ui.card().classes(card_classes):
+            # Header
+            with ui.row().classes('w-full items-center gap-2 mb-4'):
+                if is_completed:
+                    ui.icon('check_circle', size='sm').classes('text-green-600')
+                elif current_phase == 0:
+                    ui.icon('play_circle', size='sm').classes('text-blue-600')
+                else:
+                    ui.icon('radio_button_unchecked', size='sm').classes('text-gray-400')
 
-        # Understanding
-        ui.label('What is this section generally about?').classes('font-semibold mb-2')
-        understanding_input = ui.textarea(
-            placeholder='Share your initial understanding...',
-            value=pecs_data.get('initial_thoughts', '')
-        ).classes('w-full mb-2').props('rows=4 autogrow')
+                ui.label('Phase 1: Prime & Preview').classes('text-xl font-bold flex-1')
 
-        with ui.row().classes('gap-2 mb-4'):
-            ui.button('Save', on_click=lambda: self._save_prime('initial_thoughts', understanding_input.value)).classes('bg-blue-500')
-            if self.llm_service.is_available():
-                ui.button('Get AI Feedback', on_click=lambda: self._get_ai_feedback('section_understanding', understanding_input.value)).classes('bg-purple-500')
+            ui.label('First Impressions - What do you notice? What stands out?').classes('text-sm text-gray-600 mb-4')
 
-        # Prior knowledge
-        ui.label('What do you already know about this topic?').classes('font-semibold mb-2 mt-4')
-        prior_input = ui.textarea(
-            placeholder='Connect to prior knowledge...',
-            value=pecs_data.get('prior_knowledge', '')
-        ).classes('w-full mb-2').props('rows=3 autogrow')
-        ui.button('Save', on_click=lambda: self._save_prime('prior_knowledge', prior_input.value)).classes('bg-blue-500 mb-4')
+            # Show completed work (collapsed)
+            if is_completed:
+                with ui.expansion('See your work', icon='visibility').classes('w-full'):
+                    if phase_data.get('understanding'):
+                        ui.label('Your thoughts:').classes('font-semibold mt-2')
+                        ui.label(phase_data['understanding']).classes('text-sm p-2 bg-white rounded')
 
-        # Questions
-        ui.label('What questions do you have?').classes('font-semibold mb-2 mt-4')
-        questions_input = ui.textarea(
-            placeholder='What are you curious about?',
-            value=pecs_data.get('questions', '')
-        ).classes('w-full mb-2').props('rows=3 autogrow')
-        ui.button('Save', on_click=lambda: self._save_prime('questions', questions_input.value)).classes('bg-blue-500')
+                    if phase_data.get('ai_feedback'):
+                        ui.label('AI Feedback:').classes('font-semibold mt-3')
+                        ui.markdown(phase_data['ai_feedback']).classes('text-sm p-3 bg-purple-50 rounded')
+
+            # Active input area
+            else:
+                understanding_input = ui.textarea(
+                    label='What are your first impressions? What stands out to you?',
+                    placeholder='Write your initial thoughts about this material...',
+                    value=phase_data.get('understanding', '')
+                ).classes('w-full').props('rows=4')
+
+                with ui.row().classes('w-full gap-2 mt-3'):
+                    ui.button(
+                        'Save',
+                        icon='save',
+                        on_click=lambda: self._save_phase_data('prime_preview', 'understanding', understanding_input.value)
+                    ).classes('bg-blue-500')
+
+                    ui.button(
+                        'Get AI Feedback',
+                        icon='psychology',
+                        on_click=lambda: self._get_ai_feedback('prime_preview', 'section_understanding', understanding_input.value)
+                    ).classes('bg-purple-500')
+
+                    if phase_data.get('understanding'):
+                        ui.button(
+                            'Mark Complete',
+                            icon='check',
+                            on_click=lambda: self._complete_phase('prime_preview')
+                        ).classes('bg-green-500')
+
+                # Show AI feedback if available
+                if phase_data.get('ai_feedback'):
+                    with ui.card().classes('w-full mt-4 bg-purple-50'):
+                        ui.label('AI Feedback').classes('font-semibold mb-2')
+                        ui.markdown(phase_data['ai_feedback']).classes('text-sm')
 
     def _render_engage_phase(self):
-        """Engage & Explain phase"""
-        ui.markdown('**Read through the material carefully and explain the core concepts in your own words.**').classes('mb-4')
+        """Phase 2: Engage & Explain - Deep understanding"""
+        phase_data = self.section.pecs_data.get('engage_explain', {})
+        is_completed = phase_data.get('completed', False)
+        is_unlocked = self._is_phase_unlocked(1)
+        current_phase = self._get_current_phase()
 
-        pecs_data = self.section.pecs_data.get('engage_explain', {})
+        # Phase card
+        card_classes = 'w-full p-6 '
+        if is_completed:
+            card_classes += 'bg-green-50 border-l-4 border-green-500'
+        elif current_phase == 1:
+            card_classes += 'bg-blue-50 border-l-4 border-blue-500'
+        else:
+            card_classes += 'bg-gray-100'
 
-        # Toggle material
-        show_material = ui.checkbox('Show material', value=True).classes('mb-2')
-        material_container = ui.column().classes('w-full')
+        with ui.card().classes(card_classes):
+            # Header
+            with ui.row().classes('w-full items-center gap-2 mb-4'):
+                if is_completed:
+                    ui.icon('check_circle', size='sm').classes('text-green-600')
+                elif current_phase == 1:
+                    ui.icon('play_circle', size='sm').classes('text-blue-600')
+                elif not is_unlocked:
+                    ui.icon('lock', size='sm').classes('text-gray-400')
+                else:
+                    ui.icon('radio_button_unchecked', size='sm').classes('text-gray-400')
 
-        def toggle_material():
-            material_container.clear()
-            if show_material.value:
-                with material_container:
-                    with ui.expansion('Section Content', icon='book').classes('w-full bg-gray-50'):
-                        ui.markdown(self.section.content)
+                ui.label('Phase 2: Engage & Explain').classes('text-xl font-bold flex-1')
 
-        show_material.on('update:modelValue', toggle_material)
-        toggle_material()
+            if not is_unlocked:
+                ui.label('🔒 Complete Phase 1 first').classes('text-gray-500 italic')
+                return
 
-        # Explanation
-        ui.label('Explain the core concepts in your own words').classes('font-semibold mb-2 mt-4')
-        explanation_input = ui.textarea(
-            placeholder='Explain what you learned...',
-            value=pecs_data.get('explanation', '')
-        ).classes('w-full mb-2').props('rows=6 autogrow')
+            ui.label('Deep Understanding - Explain the concepts in your own words').classes('text-sm text-gray-600 mb-4')
 
-        with ui.row().classes('gap-2 mb-4'):
-            ui.button('Save', on_click=lambda: self._save_engage('explanation', explanation_input.value)).classes('bg-blue-500')
-            if self.llm_service.is_available():
-                ui.button('Get AI Feedback', on_click=lambda: self._get_ai_feedback('explanation', explanation_input.value)).classes('bg-purple-500')
+            # Show completed work (collapsed)
+            if is_completed:
+                with ui.expansion('See your work', icon='visibility').classes('w-full'):
+                    if phase_data.get('explanation'):
+                        ui.label('Your explanation:').classes('font-semibold mt-2')
+                        ui.label(phase_data['explanation']).classes('text-sm p-2 bg-white rounded')
 
-        # Self-correction prompts
-        with ui.card().classes('w-full bg-blue-50 p-4 mb-4'):
-            ui.label('Self-Correction Prompts:').classes('font-semibold mb-2')
-            ui.markdown('''
-            - Can you simplify this further?
-            - Are you using any jargon that could be explained more clearly?
-            - Have you captured the main ideas?
-            - Could someone new to this topic understand your explanation?
-            ''').classes('text-sm')
+                    if phase_data.get('ai_feedback'):
+                        ui.label('AI Feedback:').classes('font-semibold mt-3')
+                        ui.markdown(phase_data['ai_feedback']).classes('text-sm p-3 bg-purple-50 rounded')
 
-        # Analogy
-        ui.label('Create an analogy to help understand this concept (optional)').classes('font-semibold mb-2 mt-4')
-        analogy_input = ui.textarea(
-            placeholder='This is like...',
-            value=pecs_data.get('analogy', '')
-        ).classes('w-full mb-2').props('rows=3 autogrow')
-        ui.button('Save', on_click=lambda: self._save_engage('analogy', analogy_input.value)).classes('bg-blue-500')
+            # Active input area
+            else:
+                explanation_input = ui.textarea(
+                    label='Explain the key concepts in your own simple words',
+                    placeholder='Write your understanding here...',
+                    value=phase_data.get('explanation', '')
+                ).classes('w-full').props('rows=5')
+
+                with ui.row().classes('w-full gap-2 mt-3'):
+                    ui.button(
+                        'Save',
+                        icon='save',
+                        on_click=lambda: self._save_phase_data('engage_explain', 'explanation', explanation_input.value)
+                    ).classes('bg-blue-500')
+
+                    ui.button(
+                        'Get AI Feedback',
+                        icon='psychology',
+                        on_click=lambda: self._get_ai_feedback('engage_explain', 'explanation', explanation_input.value)
+                    ).classes('bg-purple-500')
+
+                    if phase_data.get('explanation'):
+                        ui.button(
+                            'Mark Complete',
+                            icon='check',
+                            on_click=lambda: self._complete_phase('engage_explain')
+                        ).classes('bg-green-500')
+
+                # Show AI feedback if available
+                if phase_data.get('ai_feedback'):
+                    with ui.card().classes('w-full mt-4 bg-purple-50'):
+                        ui.label('AI Feedback').classes('font-semibold mb-2')
+                        ui.markdown(phase_data['ai_feedback']).classes('text-sm')
 
     def _render_challenge_phase(self):
-        """Challenge & Connect phase"""
-        ui.markdown('**Think critically about what you\'ve learned and connect it to other knowledge.**').classes('mb-4')
+        """Phase 3: Challenge & Connect - Critical thinking"""
+        phase_data = self.section.pecs_data.get('challenge_connect', {})
+        is_completed = phase_data.get('completed', False)
+        is_unlocked = self._is_phase_unlocked(2)
+        current_phase = self._get_current_phase()
 
-        # Show previous explanation
-        engage_data = self.section.pecs_data.get('engage_explain', {})
-        if engage_data and 'explanation' in engage_data:
-            with ui.expansion('Your Explanation (from Engage phase)', icon='lightbulb').classes('w-full bg-gray-50 mb-4'):
-                ui.markdown(engage_data['explanation'])
+        # Phase card
+        card_classes = 'w-full p-6 '
+        if is_completed:
+            card_classes += 'bg-green-50 border-l-4 border-green-500'
+        elif current_phase == 2:
+            card_classes += 'bg-blue-50 border-l-4 border-blue-500'
+        else:
+            card_classes += 'bg-gray-100'
 
-        pecs_data = self.section.pecs_data.get('challenge_connect', {})
+        with ui.card().classes(card_classes):
+            # Header
+            with ui.row().classes('w-full items-center gap-2 mb-4'):
+                if is_completed:
+                    ui.icon('check_circle', size='sm').classes('text-green-600')
+                elif current_phase == 2:
+                    ui.icon('play_circle', size='sm').classes('text-blue-600')
+                elif not is_unlocked:
+                    ui.icon('lock', size='sm').classes('text-gray-400')
+                else:
+                    ui.icon('radio_button_unchecked', size='sm').classes('text-gray-400')
 
-        # Critical thinking
-        ui.label('Critical Thinking').classes('text-lg font-bold mb-2')
-        ui.markdown('''
-        Consider these prompts:
-        - Why is this true?
-        - What are the underlying assumptions?
-        - Are there any exceptions or limitations?
-        - How could this be applied differently?
-        ''').classes('text-sm mb-3')
+                ui.label('Phase 3: Challenge & Connect').classes('text-xl font-bold flex-1')
 
-        critical_input = ui.textarea(
-            placeholder='My challenges & critical questions...',
-            value=pecs_data.get('critical_questions', '')
-        ).classes('w-full mb-2').props('rows=5 autogrow')
+            if not is_unlocked:
+                ui.label('🔒 Complete Phase 2 first').classes('text-gray-500 italic')
+                return
 
-        with ui.row().classes('gap-2 mb-4'):
-            ui.button('Save', on_click=lambda: self._save_challenge('critical_questions', critical_input.value)).classes('bg-blue-500')
-            if self.llm_service.is_available():
-                ui.button('Get AI Feedback', on_click=lambda: self._get_ai_feedback('critical_thinking', critical_input.value)).classes('bg-purple-500')
+            ui.label('Critical Thinking - Ask questions, make connections, think deeper').classes('text-sm text-gray-600 mb-4')
 
-        # Connections
-        ui.label('Making Connections').classes('text-lg font-bold mb-2 mt-4')
-        ui.markdown('''
-        How does this relate to:
-        - Other topics you've learned
-        - Real-world applications
-        - Your personal experiences
-        - Broader concepts or theories
-        ''').classes('text-sm mb-3')
+            # Show completed work (collapsed)
+            if is_completed:
+                with ui.expansion('See your work', icon='visibility').classes('w-full'):
+                    if phase_data.get('critical_questions'):
+                        ui.label('Your questions & connections:').classes('font-semibold mt-2')
+                        ui.label(phase_data['critical_questions']).classes('text-sm p-2 bg-white rounded')
 
-        connections_input = ui.textarea(
-            placeholder='Connections to other topics/experiences...',
-            value=pecs_data.get('connections', '')
-        ).classes('w-full mb-2').props('rows=5 autogrow')
-        ui.button('Save', on_click=lambda: self._save_challenge('connections', connections_input.value)).classes('bg-blue-500')
+                    if phase_data.get('ai_feedback'):
+                        ui.label('AI Feedback:').classes('font-semibold mt-3')
+                        ui.markdown(phase_data['ai_feedback']).classes('text-sm p-3 bg-purple-50 rounded')
+
+            # Active input area
+            else:
+                critical_input = ui.textarea(
+                    label='What questions do you have? How does this connect to what you know?',
+                    placeholder='Ask critical questions, make connections...',
+                    value=phase_data.get('critical_questions', '')
+                ).classes('w-full').props('rows=5')
+
+                with ui.row().classes('w-full gap-2 mt-3'):
+                    ui.button(
+                        'Save',
+                        icon='save',
+                        on_click=lambda: self._save_phase_data('challenge_connect', 'critical_questions', critical_input.value)
+                    ).classes('bg-blue-500')
+
+                    ui.button(
+                        'Get AI Feedback',
+                        icon='psychology',
+                        on_click=lambda: self._get_ai_feedback('challenge_connect', 'critical_thinking', critical_input.value)
+                    ).classes('bg-purple-500')
+
+                    if phase_data.get('critical_questions'):
+                        ui.button(
+                            'Mark Complete',
+                            icon='check',
+                            on_click=lambda: self._complete_phase('challenge_connect')
+                        ).classes('bg-green-500')
+
+                # Show AI feedback if available
+                if phase_data.get('ai_feedback'):
+                    with ui.card().classes('w-full mt-4 bg-purple-50'):
+                        ui.label('AI Feedback').classes('font-semibold mb-2')
+                        ui.markdown(phase_data['ai_feedback']).classes('text-sm')
 
     def _render_solidify_phase(self):
-        """Solidify & Space phase"""
-        ui.markdown('**Reinforce your learning with flashcards and spaced repetition.**').classes('mb-4')
+        """Phase 4: Solidify & Space - Create flashcards"""
+        phase_data = self.section.pecs_data.get('solidify_space', {})
+        is_completed = phase_data.get('completed', False)
+        is_unlocked = self._is_phase_unlocked(3)
+        current_phase = self._get_current_phase()
 
-        # Show previous notes
-        with ui.expansion('View Previous Notes', icon='notes').classes('w-full bg-gray-50 mb-4'):
-            engage_data = self.section.pecs_data.get('engage_explain', {})
-            if engage_data and 'explanation' in engage_data:
-                ui.label('Your Explanation:').classes('font-semibold')
-                ui.markdown(engage_data['explanation']).classes('mb-3')
+        # Phase card
+        card_classes = 'w-full p-6 '
+        if is_completed:
+            card_classes += 'bg-green-50 border-l-4 border-green-500'
+        elif current_phase == 3:
+            card_classes += 'bg-blue-50 border-l-4 border-blue-500'
+        else:
+            card_classes += 'bg-gray-100'
 
-            challenge_data = self.section.pecs_data.get('challenge_connect', {})
-            if challenge_data and 'critical_questions' in challenge_data:
-                ui.label('Your Critical Thinking:').classes('font-semibold')
-                ui.markdown(challenge_data['critical_questions'])
-
-        # Flashcards
-        ui.label('Create Flashcards').classes('text-lg font-bold mb-3')
-
-        # Get existing flashcards
-        section_flashcards = self.db.get_flashcards_by_project(self.section.project_id, section_id=self.section_id)
-
-        # AI flashcard suggestions
-        if self.llm_service.is_available():
-            if ui.button('Get AI Flashcard Suggestions', icon='auto_awesome').classes('bg-purple-500 mb-4'):
-                self._generate_ai_flashcards()
-
-        # Add flashcard form
-        with ui.card().classes('w-full p-4 bg-gray-50 mb-4'):
-            question_input = ui.input(label='Question/Prompt', placeholder='What is...?').classes('w-full mb-2')
-            answer_input = ui.textarea(label='Answer/Key Idea', placeholder='Answer...').classes('w-full mb-2').props('rows=3')
-
-            def add_flashcard():
-                if question_input.value and answer_input.value:
-                    self.db.create_flashcard(
-                        project_id=self.section.project_id,
-                        question=question_input.value,
-                        answer=answer_input.value,
-                        section_id=self.section_id
-                    )
-                    ui.notify('Flashcard added!', color='positive', position='top')
-                    question_input.value = ''
-                    answer_input.value = ''
-                    ui.navigate.reload()  # Refresh to show new card
+        with ui.card().classes('w-full p-6 bg-gray-100'):
+            # Header
+            with ui.row().classes('w-full items-center gap-2 mb-4'):
+                if is_completed:
+                    ui.icon('check_circle', size='sm').classes('text-green-600')
+                elif current_phase == 3:
+                    ui.icon('play_circle', size='sm').classes('text-blue-600')
+                elif not is_unlocked:
+                    ui.icon('lock', size='sm').classes('text-gray-400')
                 else:
-                    ui.notify('Please fill in both question and answer', color='warning', position='top')
+                    ui.icon('radio_button_unchecked', size='sm').classes('text-gray-400')
 
-            ui.button('Add Flashcard', icon='add', on_click=add_flashcard).classes('bg-blue-500')
+                ui.label('Phase 4: Solidify & Space').classes('text-xl font-bold flex-1')
 
-        # Display existing flashcards
-        if section_flashcards:
-            ui.label(f'Your Flashcards ({len(section_flashcards)})').classes('text-lg font-bold mb-3')
-            for i, card in enumerate(section_flashcards, 1):
-                with ui.card().classes('w-full mb-2'):
-                    with ui.row().classes('w-full items-start justify-between'):
-                        with ui.column().classes('flex-1'):
-                            ui.label(f'Q: {card.question}').classes('font-semibold')
-                            ui.label(f'A: {card.answer}').classes('text-sm text-gray-700 mt-1')
+            if not is_unlocked:
+                ui.label('🔒 Complete Phase 3 first').classes('text-gray-500 italic')
+                return
+
+            ui.label('Create Flashcards - Turn key concepts into spaced repetition cards').classes('text-sm text-gray-600 mb-4')
+
+            # Flashcard management
+            flashcards = self.db.get_flashcards_by_section(self.section_id)
+
+            if flashcards:
+                ui.label(f'Your Flashcards ({len(flashcards)})').classes('font-semibold mb-3')
+                for card in flashcards:
+                    with ui.card().classes('w-full mb-2 bg-white'):
+                        ui.label(f'Q: {card.question}').classes('text-sm font-semibold')
+                        ui.label(f'A: {card.answer}').classes('text-sm text-gray-600 mt-1')
                         ui.button(
                             icon='delete',
-                            on_click=lambda c=card: self._delete_flashcard(c.id)
+                            on_click=lambda c=card.id: self._delete_flashcard(c)
                         ).props('flat dense').classes('text-red-500')
 
-        # Application
-        ui.label('How can you apply this knowledge?').classes('font-semibold mb-2 mt-4')
-        solidify_data = self.section.pecs_data.get('solidify_space', {})
-        application_input = ui.textarea(
-            placeholder='Real-world applications...',
-            value=solidify_data.get('application', '')
-        ).classes('w-full mb-2').props('rows=3 autogrow')
-        ui.button('Save', on_click=lambda: self._save_solidify('application', application_input.value)).classes('bg-blue-500 mb-4')
+            # Add flashcard form
+            ui.label('Add New Flashcard').classes('font-semibold mt-4 mb-2')
 
-        # Complete section button
-        if not self.section.is_completed:
-            ui.button(
-                'Mark Section as Complete',
-                icon='check_circle',
-                on_click=self._mark_complete
-            ).classes('bg-green-500 text-lg px-6 py-3 mt-4')
-        else:
-            ui.label('This section is completed!').classes('text-lg text-green-600 font-semibold mt-4')
+            question_input = ui.input(
+                label='Question',
+                placeholder='What question tests understanding?'
+            ).classes('w-full')
 
-    # Helper methods
-    def _save_prime(self, field: str, value: str):
-        """Save Prime phase data"""
-        pecs_data = self.section.pecs_data.get('prime_preview', {})
+            answer_input = ui.textarea(
+                label='Answer',
+                placeholder='The answer...'
+            ).classes('w-full').props('rows=3')
+
+            with ui.row().classes('w-full gap-2 mt-3'):
+                ui.button(
+                    'Add Flashcard',
+                    icon='add',
+                    on_click=lambda: self._add_flashcard(question_input, answer_input)
+                ).classes('bg-blue-500')
+
+                if self.llm_service.is_available():
+                    ui.button(
+                        'AI Flashcard Suggestions',
+                        icon='auto_awesome',
+                        on_click=self._generate_ai_flashcards
+                    ).classes('bg-purple-500')
+
+            # Mark complete button
+            if flashcards:
+                ui.button(
+                    'Mark Section Complete',
+                    icon='check_circle',
+                    on_click=lambda: self._complete_phase('solidify_space')
+                ).classes('bg-green-500 mt-4')
+
+    def _save_phase_data(self, phase: str, field: str, value: str):
+        """Save data for a specific field in a phase"""
+        pecs_data = self.section.pecs_data.get(phase, {})
         pecs_data[field] = value
-        self.db.update_section_pecs_data(self.section_id, 'prime_preview', pecs_data)
-        ui.notify('Saved!', color='positive', position='top')
+        self.db.update_section_pecs_data(self.section_id, phase, pecs_data)
 
-    def _save_engage(self, field: str, value: str):
-        """Save Engage phase data"""
-        pecs_data = self.section.pecs_data.get('engage_explain', {})
-        pecs_data[field] = value
-        self.db.update_section_pecs_data(self.section_id, 'engage_explain', pecs_data)
-        ui.notify('Saved!', color='positive', position='top')
+        # Refresh section data
+        self.section = self.db.get_section(self.section_id)
 
-    def _save_challenge(self, field: str, value: str):
-        """Save Challenge phase data"""
-        pecs_data = self.section.pecs_data.get('challenge_connect', {})
-        pecs_data[field] = value
-        self.db.update_section_pecs_data(self.section_id, 'challenge_connect', pecs_data)
         ui.notify('Saved!', color='positive', position='top')
+        ui.navigate.reload()
 
-    def _save_solidify(self, field: str, value: str):
-        """Save Solidify phase data"""
-        pecs_data = self.section.pecs_data.get('solidify_space', {})
-        pecs_data[field] = value
-        self.db.update_section_pecs_data(self.section_id, 'solidify_space', pecs_data)
-        ui.notify('Saved!', color='positive', position='top')
-
-    async def _get_ai_feedback(self, feedback_type: str, user_input: str):
-        """Get AI feedback on user input"""
+    async def _get_ai_feedback(self, phase: str, feedback_type: str, user_input: str):
+        """Get AI feedback and save it permanently"""
         if not user_input:
-            ui.notify('Please provide some input first', color='warning', position='top')
+            ui.notify('Please write something first', color='warning', position='top')
             return
 
         # Check if LLM service is available
@@ -358,17 +502,53 @@ class PECSLearningPage:
             dialog.close()
 
             if feedback:
-                with ui.dialog() as feedback_dialog, ui.card().classes('max-w-2xl'):
-                    ui.label('AI Feedback').classes('text-xl font-bold mb-3')
-                    ui.markdown(feedback)
-                    ui.button('Close', on_click=feedback_dialog.close).classes('mt-4')
-                feedback_dialog.open()
+                # Save feedback to database permanently
+                pecs_data = self.section.pecs_data.get(phase, {})
+                pecs_data['ai_feedback'] = feedback
+                self.db.update_section_pecs_data(self.section_id, phase, pecs_data)
+
+                # Refresh section data
+                self.section = self.db.get_section(self.section_id)
+
+                ui.notify('AI feedback saved!', color='positive', position='top')
+                ui.navigate.reload()
             else:
                 ui.notify('Could not generate feedback', color='warning', position='top')
 
         except Exception as e:
             dialog.close()
             ui.notify(f'Error: {str(e)}', color='negative', position='top')
+
+    def _complete_phase(self, phase: str):
+        """Mark a phase as completed"""
+        pecs_data = self.section.pecs_data.get(phase, {})
+        pecs_data['completed'] = True
+        self.db.update_section_pecs_data(self.section_id, phase, pecs_data)
+
+        # Refresh section data
+        self.section = self.db.get_section(self.section_id)
+
+        ui.notify('Phase completed!', color='positive', position='top')
+        ui.navigate.reload()
+
+    def _add_flashcard(self, question_input, answer_input):
+        """Add a flashcard"""
+        if not question_input.value or not answer_input.value:
+            ui.notify('Please fill in both question and answer', color='warning', position='top')
+            return
+
+        self.db.create_flashcard(
+            project_id=self.section.project_id,
+            question=question_input.value,
+            answer=answer_input.value,
+            section_id=self.section_id
+        )
+
+        question_input.value = ''
+        answer_input.value = ''
+
+        ui.notify('Flashcard added!', color='positive', position='top')
+        ui.navigate.reload()
 
     async def _generate_ai_flashcards(self):
         """Generate flashcard suggestions using AI"""
@@ -443,10 +623,4 @@ class PECSLearningPage:
         """Delete a flashcard"""
         self.db.delete_flashcard(flashcard_id)
         ui.notify('Flashcard deleted', color='positive', position='top')
-        ui.navigate.reload()
-
-    def _mark_complete(self):
-        """Mark section as completed"""
-        self.db.mark_section_completed(self.section_id, completed=True)
-        ui.notify('Section completed! Great work!', color='positive', position='top')
         ui.navigate.reload()
