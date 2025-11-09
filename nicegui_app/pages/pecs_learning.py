@@ -39,6 +39,43 @@ class PECSLearningPage:
                 'solidify_space': {}
             }
 
+        # Phase configuration - DRY principle
+        self.phase_config = {
+            'prime_preview': {
+                'index': 0,
+                'name': 'Phase 1: Prime & Preview',
+                'description': 'First Impressions - What stands out to you?',
+                'field': 'understanding',
+                'label': 'What are your first impressions? What stands out to you?',
+                'placeholder': 'Write your initial thoughts about this material...',
+                'completed_label': 'Your thoughts:',
+                'feedback_type': 'section_understanding',
+                'rows': 4
+            },
+            'engage_explain': {
+                'index': 1,
+                'name': 'Phase 2: Engage & Explain',
+                'description': 'Deep Understanding - Explain the concepts in your own words',
+                'field': 'explanation',
+                'label': 'Explain the key concepts in your own simple words',
+                'placeholder': 'Write your understanding here...',
+                'completed_label': 'Your explanation:',
+                'feedback_type': 'explanation',
+                'rows': 5
+            },
+            'challenge_connect': {
+                'index': 2,
+                'name': 'Phase 3: Challenge & Connect',
+                'description': 'Critical Thinking - Ask questions, make connections, think deeper',
+                'field': 'critical_questions',
+                'label': 'What questions do you have? How does this connect to what you know?',
+                'placeholder': 'Ask critical questions, make connections...',
+                'completed_label': 'Your questions & connections:',
+                'feedback_type': 'critical_thinking',
+                'rows': 5
+            }
+        }
+
     def render(self):
         """Render guided learning flow"""
 
@@ -123,17 +160,55 @@ class PECSLearningPage:
 
         return True
 
-    def _render_prime_phase(self):
-        """Phase 1: Prime & Preview - First impressions"""
-        phase_data = self.section.pecs_data.get('prime_preview', {})
+    def _render_conversation_ui(self, phase_key: str, phase_data: dict, input_widget, is_completed: bool):
+        """Render conversation UI (DRY helper)"""
+        ai_conversation = phase_data.get('ai_conversation', [])
+        if not ai_conversation:
+            return
+
+        if is_completed:
+            # Completed phase - simple display
+            ui.label('AI Conversation:').classes('font-semibold mt-3')
+            for msg in ai_conversation:
+                if msg['role'] == 'user':
+                    ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-50 rounded mb-1')
+                else:
+                    ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-purple-50 rounded mb-1')
+        else:
+            # Active phase - interactive display with continue button
+            with ui.card().classes('w-full mt-4 bg-purple-50'):
+                ui.label('AI Conversation').classes('font-semibold mb-2')
+                with ui.column().classes('w-full gap-1 max-h-64 overflow-auto'):
+                    for msg in ai_conversation:
+                        if msg['role'] == 'user':
+                            ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-100 rounded')
+                        else:
+                            ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-white rounded')
+
+                # Continue conversation button
+                config = self.phase_config[phase_key]
+                async def continue_conv():
+                    await self._continue_conversation(phase_key, config['feedback_type'], input_widget.value)
+
+                ui.button(
+                    'Continue Conversation',
+                    icon='chat',
+                    on_click=continue_conv
+                ).classes('bg-purple-500 mt-2')
+
+    def _render_learning_phase(self, phase_key: str):
+        """Generic learning phase renderer (DRY principle)"""
+        config = self.phase_config[phase_key]
+        phase_data = self.section.pecs_data.get(phase_key, {})
         is_completed = phase_data.get('completed', False)
+        is_unlocked = self._is_phase_unlocked(config['index'])
         current_phase = self._get_current_phase()
 
-        # Phase card
+        # Phase card styling
         card_classes = 'w-full p-6 '
         if is_completed:
             card_classes += 'bg-green-50 border-l-4 border-green-500'
-        elif current_phase == 0:
+        elif current_phase == config['index']:
             card_classes += 'bg-blue-50 border-l-4 border-blue-500'
         else:
             card_classes += 'bg-gray-100'
@@ -143,329 +218,87 @@ class PECSLearningPage:
             with ui.row().classes('w-full items-center gap-2 mb-4'):
                 if is_completed:
                     ui.icon('check_circle', size='sm').classes('text-green-600')
-                elif current_phase == 0:
+                elif current_phase == config['index']:
                     ui.icon('play_circle', size='sm').classes('text-blue-600')
+                elif not is_unlocked:
+                    ui.icon('lock', size='sm').classes('text-gray-400')
                 else:
                     ui.icon('radio_button_unchecked', size='sm').classes('text-gray-400')
 
-                ui.label('Phase 1: Prime & Preview').classes('text-xl font-bold flex-1')
+                ui.label(config['name']).classes('text-xl font-bold flex-1')
 
-            ui.label('First Impressions - What do you notice? What stands out?').classes('text-sm text-gray-600 mb-4')
+            if not is_unlocked:
+                ui.label(f'🔒 Complete Phase {config["index"]} first').classes('text-gray-500 italic')
+                return
+
+            ui.label(config['description']).classes('text-sm text-gray-600 mb-4')
 
             # Show completed work (collapsed)
             if is_completed:
                 with ui.expansion('See your work', icon='visibility').classes('w-full'):
-                    if phase_data.get('understanding'):
-                        ui.label('Your thoughts:').classes('font-semibold mt-2')
-                        ui.label(phase_data['understanding']).classes('text-sm p-2 bg-white rounded')
+                    if phase_data.get(config['field']):
+                        ui.label(config['completed_label']).classes('font-semibold mt-2')
+                        ui.label(phase_data[config['field']]).classes('text-sm p-2 bg-white rounded')
 
-                    # Show AI conversation if available
-                    ai_conversation = phase_data.get('ai_conversation', [])
-                    if ai_conversation:
-                        ui.label('AI Conversation:').classes('font-semibold mt-3')
-                        for msg in ai_conversation:
-                            if msg['role'] == 'user':
-                                ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-50 rounded mb-1')
-                            else:
-                                ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-purple-50 rounded mb-1')
+                    # Show conversation
+                    self._render_conversation_ui(phase_key, phase_data, None, True)
 
-                    # Button to unmark as complete
+                    # Unmark button
                     ui.button(
                         'Unmark as Complete',
                         icon='edit',
-                        on_click=lambda: self._uncomplete_phase('prime_preview')
+                        on_click=lambda: self._uncomplete_phase(phase_key)
                     ).classes('bg-gray-500 mt-3')
 
             # Active input area
             else:
-                understanding_input = ui.textarea(
-                    label='What are your first impressions? What stands out to you?',
-                    placeholder='Write your initial thoughts about this material...',
-                    value=phase_data.get('understanding', '')
-                ).classes('w-full').props('rows=4')
+                input_widget = ui.textarea(
+                    label=config['label'],
+                    placeholder=config['placeholder'],
+                    value=phase_data.get(config['field'], '')
+                ).classes('w-full').props(f'rows={config["rows"]}')
 
-                # Create async wrappers
-                async def get_prime_feedback():
-                    await self._get_ai_feedback('prime_preview', 'section_understanding', understanding_input.value)
+                # Async wrappers
+                async def get_feedback():
+                    await self._get_ai_feedback(phase_key, config['feedback_type'], input_widget.value)
 
-                async def complete_prime():
-                    await self._complete_phase('prime_preview')
+                async def complete_phase():
+                    await self._complete_phase(phase_key)
 
                 with ui.row().classes('w-full gap-2 mt-3'):
                     ui.button(
                         'Save',
                         icon='save',
-                        on_click=lambda: self._save_phase_data('prime_preview', 'understanding', understanding_input.value)
+                        on_click=lambda: self._save_phase_data(phase_key, config['field'], input_widget.value)
                     ).classes('bg-blue-500')
 
                     ui.button(
                         'Get AI Feedback',
                         icon='psychology',
-                        on_click=get_prime_feedback
+                        on_click=get_feedback
                     ).classes('bg-purple-500')
 
-                    if phase_data.get('understanding'):
+                    if phase_data.get(config['field']):
                         ui.button(
                             'Mark Complete',
                             icon='check',
-                            on_click=complete_prime
+                            on_click=complete_phase
                         ).classes('bg-green-500')
 
-                # Show AI conversation if available
-                ai_conversation = phase_data.get('ai_conversation', [])
-                if ai_conversation:
-                    with ui.card().classes('w-full mt-4 bg-purple-50'):
-                        ui.label('AI Conversation').classes('font-semibold mb-2')
-                        with ui.column().classes('w-full gap-1 max-h-64 overflow-auto'):
-                            for msg in ai_conversation:
-                                if msg['role'] == 'user':
-                                    ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-100 rounded')
-                                else:
-                                    ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-white rounded')
+                # Show conversation
+                self._render_conversation_ui(phase_key, phase_data, input_widget, False)
 
-                        # Continue conversation button
-                        async def continue_prime_conversation():
-                            await self._continue_conversation('prime_preview', 'section_understanding', understanding_input.value)
-
-                        ui.button(
-                            'Continue Conversation',
-                            icon='chat',
-                            on_click=continue_prime_conversation
-                        ).classes('bg-purple-500 mt-2')
+    def _render_prime_phase(self):
+        """Phase 1: Prime & Preview - First impressions"""
+        self._render_learning_phase('prime_preview')
 
     def _render_engage_phase(self):
         """Phase 2: Engage & Explain - Deep understanding"""
-        phase_data = self.section.pecs_data.get('engage_explain', {})
-        is_completed = phase_data.get('completed', False)
-        is_unlocked = self._is_phase_unlocked(1)
-        current_phase = self._get_current_phase()
-
-        # Phase card
-        card_classes = 'w-full p-6 '
-        if is_completed:
-            card_classes += 'bg-green-50 border-l-4 border-green-500'
-        elif current_phase == 1:
-            card_classes += 'bg-blue-50 border-l-4 border-blue-500'
-        else:
-            card_classes += 'bg-gray-100'
-
-        with ui.card().classes(card_classes):
-            # Header
-            with ui.row().classes('w-full items-center gap-2 mb-4'):
-                if is_completed:
-                    ui.icon('check_circle', size='sm').classes('text-green-600')
-                elif current_phase == 1:
-                    ui.icon('play_circle', size='sm').classes('text-blue-600')
-                elif not is_unlocked:
-                    ui.icon('lock', size='sm').classes('text-gray-400')
-                else:
-                    ui.icon('radio_button_unchecked', size='sm').classes('text-gray-400')
-
-                ui.label('Phase 2: Engage & Explain').classes('text-xl font-bold flex-1')
-
-            if not is_unlocked:
-                ui.label('🔒 Complete Phase 1 first').classes('text-gray-500 italic')
-                return
-
-            ui.label('Deep Understanding - Explain the concepts in your own words').classes('text-sm text-gray-600 mb-4')
-
-            # Show completed work (collapsed)
-            if is_completed:
-                with ui.expansion('See your work', icon='visibility').classes('w-full'):
-                    if phase_data.get('explanation'):
-                        ui.label('Your explanation:').classes('font-semibold mt-2')
-                        ui.label(phase_data['explanation']).classes('text-sm p-2 bg-white rounded')
-
-                    # Show AI conversation if available
-                    ai_conversation = phase_data.get('ai_conversation', [])
-                    if ai_conversation:
-                        ui.label('AI Conversation:').classes('font-semibold mt-3')
-                        for msg in ai_conversation:
-                            if msg['role'] == 'user':
-                                ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-50 rounded mb-1')
-                            else:
-                                ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-purple-50 rounded mb-1')
-
-                    # Button to unmark as complete
-                    ui.button(
-                        'Unmark as Complete',
-                        icon='edit',
-                        on_click=lambda: self._uncomplete_phase('engage_explain')
-                    ).classes('bg-gray-500 mt-3')
-
-            # Active input area
-            else:
-                explanation_input = ui.textarea(
-                    label='Explain the key concepts in your own simple words',
-                    placeholder='Write your understanding here...',
-                    value=phase_data.get('explanation', '')
-                ).classes('w-full').props('rows=5')
-
-                # Create async wrappers
-                async def get_engage_feedback():
-                    await self._get_ai_feedback('engage_explain', 'explanation', explanation_input.value)
-
-                async def complete_engage():
-                    await self._complete_phase('engage_explain')
-
-                with ui.row().classes('w-full gap-2 mt-3'):
-                    ui.button(
-                        'Save',
-                        icon='save',
-                        on_click=lambda: self._save_phase_data('engage_explain', 'explanation', explanation_input.value)
-                    ).classes('bg-blue-500')
-
-                    ui.button(
-                        'Get AI Feedback',
-                        icon='psychology',
-                        on_click=get_engage_feedback
-                    ).classes('bg-purple-500')
-
-                    if phase_data.get('explanation'):
-                        ui.button(
-                            'Mark Complete',
-                            icon='check',
-                            on_click=complete_engage
-                        ).classes('bg-green-500')
-
-                # Show AI conversation if available
-                ai_conversation = phase_data.get('ai_conversation', [])
-                if ai_conversation:
-                    with ui.card().classes('w-full mt-4 bg-purple-50'):
-                        ui.label('AI Conversation').classes('font-semibold mb-2')
-                        with ui.column().classes('w-full gap-1 max-h-64 overflow-auto'):
-                            for msg in ai_conversation:
-                                if msg['role'] == 'user':
-                                    ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-100 rounded')
-                                else:
-                                    ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-white rounded')
-
-                        # Continue conversation button
-                        async def continue_engage_conversation():
-                            await self._continue_conversation('engage_explain', 'explanation', explanation_input.value)
-
-                        ui.button(
-                            'Continue Conversation',
-                            icon='chat',
-                            on_click=continue_engage_conversation
-                        ).classes('bg-purple-500 mt-2')
+        self._render_learning_phase('engage_explain')
 
     def _render_challenge_phase(self):
         """Phase 3: Challenge & Connect - Critical thinking"""
-        phase_data = self.section.pecs_data.get('challenge_connect', {})
-        is_completed = phase_data.get('completed', False)
-        is_unlocked = self._is_phase_unlocked(2)
-        current_phase = self._get_current_phase()
-
-        # Phase card
-        card_classes = 'w-full p-6 '
-        if is_completed:
-            card_classes += 'bg-green-50 border-l-4 border-green-500'
-        elif current_phase == 2:
-            card_classes += 'bg-blue-50 border-l-4 border-blue-500'
-        else:
-            card_classes += 'bg-gray-100'
-
-        with ui.card().classes(card_classes):
-            # Header
-            with ui.row().classes('w-full items-center gap-2 mb-4'):
-                if is_completed:
-                    ui.icon('check_circle', size='sm').classes('text-green-600')
-                elif current_phase == 2:
-                    ui.icon('play_circle', size='sm').classes('text-blue-600')
-                elif not is_unlocked:
-                    ui.icon('lock', size='sm').classes('text-gray-400')
-                else:
-                    ui.icon('radio_button_unchecked', size='sm').classes('text-gray-400')
-
-                ui.label('Phase 3: Challenge & Connect').classes('text-xl font-bold flex-1')
-
-            if not is_unlocked:
-                ui.label('🔒 Complete Phase 2 first').classes('text-gray-500 italic')
-                return
-
-            ui.label('Critical Thinking - Ask questions, make connections, think deeper').classes('text-sm text-gray-600 mb-4')
-
-            # Show completed work (collapsed)
-            if is_completed:
-                with ui.expansion('See your work', icon='visibility').classes('w-full'):
-                    if phase_data.get('critical_questions'):
-                        ui.label('Your questions & connections:').classes('font-semibold mt-2')
-                        ui.label(phase_data['critical_questions']).classes('text-sm p-2 bg-white rounded')
-
-                    # Show AI conversation if available
-                    ai_conversation = phase_data.get('ai_conversation', [])
-                    if ai_conversation:
-                        ui.label('AI Conversation:').classes('font-semibold mt-3')
-                        for msg in ai_conversation:
-                            if msg['role'] == 'user':
-                                ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-50 rounded mb-1')
-                            else:
-                                ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-purple-50 rounded mb-1')
-
-                    # Button to unmark as complete
-                    ui.button(
-                        'Unmark as Complete',
-                        icon='edit',
-                        on_click=lambda: self._uncomplete_phase('challenge_connect')
-                    ).classes('bg-gray-500 mt-3')
-
-            # Active input area
-            else:
-                critical_input = ui.textarea(
-                    label='What questions do you have? How does this connect to what you know?',
-                    placeholder='Ask critical questions, make connections...',
-                    value=phase_data.get('critical_questions', '')
-                ).classes('w-full').props('rows=5')
-
-                # Create async wrappers
-                async def get_challenge_feedback():
-                    await self._get_ai_feedback('challenge_connect', 'critical_thinking', critical_input.value)
-
-                async def complete_challenge():
-                    await self._complete_phase('challenge_connect')
-
-                with ui.row().classes('w-full gap-2 mt-3'):
-                    ui.button(
-                        'Save',
-                        icon='save',
-                        on_click=lambda: self._save_phase_data('challenge_connect', 'critical_questions', critical_input.value)
-                    ).classes('bg-blue-500')
-
-                    ui.button(
-                        'Get AI Feedback',
-                        icon='psychology',
-                        on_click=get_challenge_feedback
-                    ).classes('bg-purple-500')
-
-                    if phase_data.get('critical_questions'):
-                        ui.button(
-                            'Mark Complete',
-                            icon='check',
-                            on_click=complete_challenge
-                        ).classes('bg-green-500')
-
-                # Show AI conversation if available
-                ai_conversation = phase_data.get('ai_conversation', [])
-                if ai_conversation:
-                    with ui.card().classes('w-full mt-4 bg-purple-50'):
-                        ui.label('AI Conversation').classes('font-semibold mb-2')
-                        with ui.column().classes('w-full gap-1 max-h-64 overflow-auto'):
-                            for msg in ai_conversation:
-                                if msg['role'] == 'user':
-                                    ui.label(f"You: {msg['content']}").classes('text-sm p-2 bg-blue-100 rounded')
-                                else:
-                                    ui.markdown(f"**AI:** {msg['content']}").classes('text-sm p-2 bg-white rounded')
-
-                        # Continue conversation button
-                        async def continue_challenge_conversation():
-                            await self._continue_conversation('challenge_connect', 'critical_thinking', critical_input.value)
-
-                        ui.button(
-                            'Continue Conversation',
-                            icon='chat',
-                            on_click=continue_challenge_conversation
-                        ).classes('bg-purple-500 mt-2')
+        self._render_learning_phase('challenge_connect')
 
     def _render_solidify_phase(self):
         """Phase 4: Solidify & Space - Create flashcards"""
