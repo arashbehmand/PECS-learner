@@ -171,6 +171,10 @@ class PECSLearningPage:
                     value=phase_data.get('understanding', '')
                 ).classes('w-full').props('rows=4')
 
+                # Create async wrapper for AI feedback
+                async def get_prime_feedback():
+                    await self._get_ai_feedback('prime_preview', 'section_understanding', understanding_input.value)
+
                 with ui.row().classes('w-full gap-2 mt-3'):
                     ui.button(
                         'Save',
@@ -181,7 +185,7 @@ class PECSLearningPage:
                     ui.button(
                         'Get AI Feedback',
                         icon='psychology',
-                        on_click=lambda: self._get_ai_feedback('prime_preview', 'section_understanding', understanding_input.value)
+                        on_click=get_prime_feedback
                     ).classes('bg-purple-500')
 
                     if phase_data.get('understanding'):
@@ -252,6 +256,10 @@ class PECSLearningPage:
                     value=phase_data.get('explanation', '')
                 ).classes('w-full').props('rows=5')
 
+                # Create async wrapper for AI feedback
+                async def get_engage_feedback():
+                    await self._get_ai_feedback('engage_explain', 'explanation', explanation_input.value)
+
                 with ui.row().classes('w-full gap-2 mt-3'):
                     ui.button(
                         'Save',
@@ -262,7 +270,7 @@ class PECSLearningPage:
                     ui.button(
                         'Get AI Feedback',
                         icon='psychology',
-                        on_click=lambda: self._get_ai_feedback('engage_explain', 'explanation', explanation_input.value)
+                        on_click=get_engage_feedback
                     ).classes('bg-purple-500')
 
                     if phase_data.get('explanation'):
@@ -333,6 +341,10 @@ class PECSLearningPage:
                     value=phase_data.get('critical_questions', '')
                 ).classes('w-full').props('rows=5')
 
+                # Create async wrapper for AI feedback
+                async def get_challenge_feedback():
+                    await self._get_ai_feedback('challenge_connect', 'critical_thinking', critical_input.value)
+
                 with ui.row().classes('w-full gap-2 mt-3'):
                     ui.button(
                         'Save',
@@ -343,7 +355,7 @@ class PECSLearningPage:
                     ui.button(
                         'Get AI Feedback',
                         icon='psychology',
-                        on_click=lambda: self._get_ai_feedback('challenge_connect', 'critical_thinking', critical_input.value)
+                        on_click=get_challenge_feedback
                     ).classes('bg-purple-500')
 
                     if phase_data.get('critical_questions'):
