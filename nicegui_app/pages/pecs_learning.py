@@ -143,6 +143,38 @@ class PECSLearningPage:
                     on_click=regenerate
                 ).classes('bg-blue-500 mt-4')
 
+            # Check if there's a next section
+            all_sections = self.db.get_sections_by_project(self.project_id)
+            next_section = None
+            for section in all_sections:
+                if section.order_index == self.section.order_index + 1:
+                    next_section = section
+                    break
+
+            if next_section:
+                # Show prominent "Continue to Next Section" button
+                ui.label('Ready to continue your learning journey?').classes('text-lg font-semibold mt-4 mb-2')
+                with ui.row().classes('w-full gap-2'):
+                    ui.button(
+                        f'Continue to: {next_section.title or f"Section {next_section.order_index + 1}"}',
+                        icon='arrow_forward',
+                        on_click=lambda: ui.navigate.to(f'/project/{self.project_id}/section/{next_section.id}')
+                    ).classes('bg-green-600 text-lg px-6 py-3')
+
+                    ui.button(
+                        'Back to Project',
+                        icon='home',
+                        on_click=lambda: ui.navigate.to(f'/project/{self.project_id}')
+                    ).classes('bg-gray-500')
+            else:
+                # No more sections - show project completion
+                ui.label('🎓 You\'ve completed all sections in this project!').classes('text-lg font-semibold mt-4 mb-2 text-green-700')
+                ui.button(
+                    'Back to Project',
+                    icon='home',
+                    on_click=lambda: ui.navigate.to(f'/project/{self.project_id}')
+                ).classes('bg-blue-600 mt-2')
+
     def _render_progress_indicator(self):
         """Render progress bar showing current phase"""
         phases = ['Prime', 'Engage', 'Challenge', 'Solidify']
