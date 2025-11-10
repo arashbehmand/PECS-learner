@@ -516,8 +516,23 @@ class PECSLearningPage:
         ui.notify('Flashcard added!', color='positive', position='top')
         ui.navigate.reload()
 
+    def _get_flashcard_context(self, additional_suggestions=None):
+        """DRY helper: Get all existing flashcards for context"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Get existing flashcards from database
+        db_flashcards = self.db.get_flashcards_by_project(self.section.project_id, self.section_id)
+        existing_db_cards = [{'question': card.question, 'answer': card.answer} for card in db_flashcards]
+
+        # Combine with additional suggestions if provided
+        all_cards = existing_db_cards + (additional_suggestions or [])
+
+        logger.info(f"Flashcard context: {len(existing_db_cards)} DB cards + {len(additional_suggestions or [])} suggestions = {len(all_cards)} total")
+        return all_cards
+
     async def _generate_ai_flashcards(self, existing_suggestions=None):
-        """Generate flashcard suggestions using AI"""
+        """Generate flashcard suggestions using AI and show dialog"""
         engage_data = self.section.pecs_data.get('engage_explain', {})
         explanation = engage_data.get('explanation', '')
 
@@ -541,18 +556,13 @@ class PECSLearningPage:
         try:
             challenge_data = self.section.pecs_data.get('challenge_connect', {})
 
-            # Get existing flashcards from database to avoid duplicates
-            db_flashcards = self.db.get_flashcards_by_project(self.section.project_id, self.section_id)
-            existing_db_cards = [{'question': card.question, 'answer': card.answer} for card in db_flashcards]
-
-            # Combine database cards with previous suggestions
-            all_existing_cards = existing_db_cards + (existing_suggestions or [])
+            # Get complete context (DRY)
+            all_existing_cards = self._get_flashcard_context(existing_suggestions)
 
             # Run LLM call in thread pool to avoid blocking UI
             import asyncio
             import logging
             logger = logging.getLogger(__name__)
-            logger.info(f"Generating flashcards. Existing DB cards: {len(existing_db_cards)}, Previous suggestions: {len(existing_suggestions or [])}")
 
             suggestions = await asyncio.to_thread(
                 self.llm_service.suggest_flashcards,
@@ -581,6 +591,9 @@ class PECSLearningPage:
 
     async def _show_flashcard_dialog(self, new_suggestions: list, previous_suggestions: list = None):
         """Show interactive flashcard dialog that stays open"""
+        import logging
+        logger = logging.getLogger(__name__)
+
         if previous_suggestions is None:
             previous_suggestions = []
 
@@ -588,8 +601,16 @@ class PECSLearningPage:
         all_suggestions = previous_suggestions + new_suggestions
         added_indices = set()  # Track which cards have been added
 
+        logger.info(f"Opening flashcard dialog with {len(all_suggestions)} total suggestions ({len(previous_suggestions)} previous + {len(new_suggestions)} new)")
+
         with ui.dialog() as dialog, ui.card().classes('max-w-3xl'):
             ui.label('AI Flashcard Suggestions').classes('text-xl font-bold mb-3')
+
+            # Loading indicator (initially hidden)
+            loading_container = ui.column().classes('w-full').style('display: none')
+            with loading_container:
+                ui.label('Generating more suggestions...').classes('text-lg')
+                ui.spinner(size='lg')
 
             # Container for suggestions (will be updated)
             suggestions_container = ui.column().classes('w-full')
@@ -620,6 +641,7 @@ class PECSLearningPage:
                                             section_id=self.section_id
                                         )
                                         added_indices.add(idx)
+                                        logger.info(f"Added flashcard {idx + 1} to database")
                                         ui.notify('Flashcard added!', color='positive', position='top')
                                         render_suggestions()  # Re-render to update UI
                                     return handler
@@ -633,10 +655,56 @@ class PECSLearningPage:
             render_suggestions()
 
             # Action buttons at bottom
-            with ui.row().classes('w-full gap-2 mt-4'):
+            button_row = ui.row().classes('w-full gap-2 mt-4')
+            with button_row:
                 async def generate_more():
-                    dialog.close()
-                    await self._generate_ai_flashcards(existing_suggestions=all_suggestions)
+                    """Generate more cards and update THIS dialog"""
+                    nonlocal all_suggestions
+
+                    # Show loading, hide buttons
+                    loading_container.style('display: block')
+                    suggestions_container.style('display: none')
+                    button_row.style('display: none')
+
+                    try:
+                        logger.info(f"Generating more flashcards with {len(all_suggestions)} existing context")
+
+                        # Get complete context (DRY)
+                        all_existing_cards = self._get_flashcard_context(all_suggestions)
+
+                        # Get engage/challenge data
+                        engage_data = self.section.pecs_data.get('engage_explain', {})
+                        challenge_data = self.section.pecs_data.get('challenge_connect', {})
+
+                        # Generate more cards
+                        import asyncio
+                        new_cards = await asyncio.to_thread(
+                            self.llm_service.suggest_flashcards,
+                            chunk_text=self.section.content,
+                            user_explanation=engage_data.get('explanation', ''),
+                            user_challenges=challenge_data.get('critical_questions', ''),
+                            existing_cards=all_existing_cards
+                        )
+
+                        if new_cards:
+                            logger.info(f"Generated {len(new_cards)} more flashcards")
+                            # Add new cards to the list
+                            all_suggestions = all_suggestions + new_cards
+                            ui.notify(f'Generated {len(new_cards)} more cards!', color='positive', position='top')
+                        else:
+                            logger.warning("No additional flashcards generated")
+                            ui.notify('Could not generate more cards', color='warning', position='top')
+
+                    except Exception as e:
+                        logger.error(f'Error generating more flashcards: {str(e)}', exc_info=True)
+                        ui.notify(f'Error: {str(e)}', color='negative', position='top')
+
+                    finally:
+                        # Hide loading, show cards and buttons
+                        loading_container.style('display: none')
+                        suggestions_container.style('display: block')
+                        button_row.style('display: flex')
+                        render_suggestions()  # Re-render with new cards
 
                 ui.button(
                     'Generate More',
@@ -645,6 +713,7 @@ class PECSLearningPage:
                 ).classes('bg-purple-500')
 
                 def close_and_reload():
+                    logger.info(f"Closing dialog. Added {len(added_indices)} cards.")
                     dialog.close()
                     if added_indices:
                         ui.navigate.reload()
