@@ -234,6 +234,73 @@ class LLMService:
         """Get feedback on explanation simplicity and clarity."""
         return self.analyze_explanation("", explanation)  # Reuse explanation analysis
 
+    def suggest_flashcards_with_context(self, formatted_context: str) -> Optional[List[Dict[str, str]]]:
+        """
+        Suggest flashcard Q/A pairs based on formatted learning context.
+
+        This is the NEW preferred method that uses pre-formatted context from
+        _build_learning_context() and _format_context_for_flashcards().
+
+        Args:
+            formatted_context: Pre-formatted string with all learning context
+
+        Returns:
+            List of flashcard dicts with 'question' and 'answer' keys
+        """
+        if not self.is_available():
+            logger.warning("LLM service is not available. Please check your API key configuration.")
+            return None
+
+        try:
+            prompt = f"""{formatted_context}
+
+Based on the student's learning journey above, suggest 2-3 high-quality flashcard Q/A pairs.
+
+Requirements:
+1. Question should be clear and test understanding
+2. Answer should be concise but complete
+3. Focus on key concepts and relationships
+4. Avoid trivial or obvious questions
+5. If existing flashcards are listed above, generate DIFFERENT cards on new aspects
+
+Return ONLY a JSON array of objects, each with 'question' and 'answer' fields.
+Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer": "..."}}]"""
+
+            logger.debug(f"Flashcard generation prompt length: {len(prompt)} chars")
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a learning assistant creating effective flashcards. Always return valid JSON array."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000
+            )
+
+            content = response.choices[0].message.content
+            logger.debug(f"Raw LLM response: {content[:200]}...")
+
+            # Extract JSON from potential markdown wrapper
+            json_str = extract_json_from_markdown(content)
+
+            try:
+                qa_pairs = json.loads(json_str)
+                if isinstance(qa_pairs, list):
+                    logger.info(f"Successfully generated {len(qa_pairs)} flashcards")
+                    return qa_pairs[:3]  # Return at most 3 pairs
+                else:
+                    logger.error(f"Flashcard response is not a list: {type(qa_pairs)}")
+                    return None
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse flashcard suggestions as JSON: {e}")
+                logger.error(f"Attempted to parse: {json_str[:200]}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error generating flashcard suggestions: {str(e)}", exc_info=True)
+            return None
+
     def suggest_flashcards(self, chunk_text: str, user_explanation: str, user_challenges: str, existing_cards: List[Dict[str, str]] = None) -> Optional[List[Dict[str, str]]]:
         """Suggest flashcard Q/A pairs based on the material and user's understanding."""
         if not self.is_available():

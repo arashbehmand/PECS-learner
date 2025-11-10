@@ -516,31 +516,102 @@ class PECSLearningPage:
         ui.notify('Flashcard added!', color='positive', position='top')
         ui.navigate.reload()
 
-    def _get_flashcard_context(self, additional_suggestions=None):
-        """DRY helper: Get all existing flashcards for context"""
+    def _build_learning_context(self, include_flashcards=True, include_conversations=False):
+        """
+        DRY: Build comprehensive learning context for ALL AI features
+
+        This is the single source of truth for what the AI knows about the student's learning journey.
+        Used across: Prime feedback, Engage feedback, Challenge feedback, Flashcards, Completion report
+
+        Args:
+            include_flashcards: Include committed flashcards from database
+            include_conversations: Include AI conversation history
+
+        Returns:
+            dict with all relevant context
+        """
         import logging
         logger = logging.getLogger(__name__)
 
-        # Get existing flashcards from database
-        db_flashcards = self.db.get_flashcards_by_project(self.section.project_id, self.section_id)
-        existing_db_cards = [{'question': card.question, 'answer': card.answer} for card in db_flashcards]
+        pecs_data = self.section.pecs_data or {}
 
-        # Combine with additional suggestions if provided
-        all_cards = existing_db_cards + (additional_suggestions or [])
+        context = {
+            'content': self.section.content,
+            'understanding': None,
+            'explanation': None,
+            'critical_thinking': None,
+            'conversations': {},
+            'flashcards': []
+        }
 
-        logger.info(f"Flashcard context: {len(existing_db_cards)} DB cards + {len(additional_suggestions or [])} suggestions = {len(all_cards)} total")
-        return all_cards
+        # Prime phase data
+        if 'prime_preview' in pecs_data:
+            prime = pecs_data['prime_preview']
+            context['understanding'] = prime.get('understanding')
+            if include_conversations:
+                context['conversations']['prime'] = prime.get('ai_conversation', [])
+
+        # Engage phase data
+        if 'engage_explain' in pecs_data:
+            engage = pecs_data['engage_explain']
+            context['explanation'] = engage.get('explanation')
+            if include_conversations:
+                context['conversations']['engage'] = engage.get('ai_conversation', [])
+
+        # Challenge phase data
+        if 'challenge_connect' in pecs_data:
+            challenge = pecs_data['challenge_connect']
+            context['critical_thinking'] = challenge.get('critical_questions')
+            if include_conversations:
+                context['conversations']['challenge'] = challenge.get('ai_conversation', [])
+
+        # Flashcards - ONLY committed ones from database (not ephemeral suggestions!)
+        if include_flashcards:
+            db_flashcards = self.db.get_flashcards_by_project(self.section.project_id, self.section_id)
+            context['flashcards'] = [{'question': c.question, 'answer': c.answer} for c in db_flashcards]
+
+        logger.debug(f"Built learning context: understanding={bool(context['understanding'])}, explanation={bool(context['explanation'])}, critical_thinking={bool(context['critical_thinking'])}, flashcards={len(context['flashcards'])}")
+
+        return context
+
+    def _format_context_for_flashcards(self, context):
+        """Format learning context specifically for flashcard generation"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        parts = []
+
+        # Learning material (truncated)
+        parts.append(f"Learning Material:\n{context['content'][:1500]}...")
+
+        # Student's learning journey
+        if context.get('understanding'):
+            parts.append(f"\nStudent's Initial Understanding:\n{context['understanding']}")
+
+        if context.get('explanation'):
+            parts.append(f"\nStudent's Explanation:\n{context['explanation']}")
+
+        if context.get('critical_thinking'):
+            parts.append(f"\nStudent's Questions and Critical Thinking:\n{context['critical_thinking']}")
+
+        # Existing flashcards (committed to DB)
+        if context.get('flashcards'):
+            parts.append(f"\n{'='*60}")
+            parts.append(f"EXISTING FLASHCARDS ({len(context['flashcards'])} cards - DO NOT DUPLICATE):")
+            parts.append(f"{'='*60}")
+            for i, card in enumerate(context['flashcards'], 1):
+                parts.append(f"\n{i}. Q: {card['question']}")
+                parts.append(f"   A: {card['answer']}")
+            parts.append(f"\n{'='*60}")
+            parts.append("Generate DIFFERENT flashcards covering new aspects not in the list above.")
+
+        formatted = "\n".join(parts)
+        logger.info(f"Formatted flashcard context: {len(context.get('flashcards', []))} existing cards, {len(formatted)} chars total")
+
+        return formatted
 
     async def _generate_ai_flashcards(self, existing_suggestions=None):
         """Generate flashcard suggestions using AI and show dialog"""
-        engage_data = self.section.pecs_data.get('engage_explain', {})
-        explanation = engage_data.get('explanation', '')
-
-        if not explanation:
-            ui.notify('Please complete the Engage phase first', color='warning', position='top')
-            return
-
-        # Check if LLM service is available
         if not self.llm_service.is_available():
             ui.notify('AI features require an OpenAI API key. Set OPENAI_API_KEY environment variable.',
                      color='warning', position='top')
@@ -554,22 +625,20 @@ class PECSLearningPage:
         loading_dialog.open()
 
         try:
-            challenge_data = self.section.pecs_data.get('challenge_connect', {})
-
-            # Get complete context (DRY)
-            all_existing_cards = self._get_flashcard_context(existing_suggestions)
-
-            # Run LLM call in thread pool to avoid blocking UI
             import asyncio
             import logging
             logger = logging.getLogger(__name__)
 
+            # Build complete learning context (DRY)
+            context = self._build_learning_context(include_flashcards=True, include_conversations=False)
+
+            # Format for flashcard generation
+            formatted_context = self._format_context_for_flashcards(context)
+
+            # Generate flashcards with proper context
             suggestions = await asyncio.to_thread(
-                self.llm_service.suggest_flashcards,
-                chunk_text=self.section.content,
-                user_explanation=explanation,
-                user_challenges=challenge_data.get('critical_questions', ''),
-                existing_cards=all_existing_cards
+                self.llm_service.suggest_flashcards_with_context,
+                formatted_context=formatted_context
             )
 
             loading_dialog.close()
@@ -667,23 +736,19 @@ class PECSLearningPage:
                     button_row.style('display: none')
 
                     try:
-                        logger.info(f"Generating more flashcards with {len(all_suggestions)} existing context")
+                        # Build fresh learning context (includes latest DB flashcards)
+                        context = self._build_learning_context(include_flashcards=True, include_conversations=False)
 
-                        # Get complete context (DRY)
-                        all_existing_cards = self._get_flashcard_context(all_suggestions)
+                        logger.info(f"Generating more flashcards. Current DB has {len(context['flashcards'])} cards")
 
-                        # Get engage/challenge data
-                        engage_data = self.section.pecs_data.get('engage_explain', {})
-                        challenge_data = self.section.pecs_data.get('challenge_connect', {})
+                        # Format for flashcard generation
+                        formatted_context = self._format_context_for_flashcards(context)
 
                         # Generate more cards
                         import asyncio
                         new_cards = await asyncio.to_thread(
-                            self.llm_service.suggest_flashcards,
-                            chunk_text=self.section.content,
-                            user_explanation=engage_data.get('explanation', ''),
-                            user_challenges=challenge_data.get('critical_questions', ''),
-                            existing_cards=all_existing_cards
+                            self.llm_service.suggest_flashcards_with_context,
+                            formatted_context=formatted_context
                         )
 
                         if new_cards:
