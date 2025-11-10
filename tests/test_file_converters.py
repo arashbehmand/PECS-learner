@@ -137,12 +137,9 @@ def test_convert_file_to_text_text_attribute(mock_markitdown):
     """Test conversion with .text attribute."""
     uploaded_file = MockUploadedFile("test.docx", b"fake docx content")
 
-    mock_result = MagicMock()
+    # Create a mock result with only .text attribute
+    mock_result = MagicMock(spec=['text'])
     mock_result.text = "Text attribute content"
-    # Remove other attributes to test .text path
-    type(mock_result).text_content = PropertyMock(side_effect=AttributeError)
-    type(mock_result).markdown = PropertyMock(side_effect=AttributeError)
-    type(mock_result).content = PropertyMock(side_effect=AttributeError)
 
     mock_converter = MagicMock()
     mock_converter.convert.return_value = mock_result
@@ -162,12 +159,9 @@ def test_convert_file_to_text_markdown_attribute(mock_markitdown):
     """Test conversion with .markdown attribute."""
     uploaded_file = MockUploadedFile("test.docx", b"fake docx content")
 
-    mock_result = MagicMock()
+    # Create a mock result with only .markdown attribute
+    mock_result = MagicMock(spec=['markdown'])
     mock_result.markdown = "Markdown attribute content"
-    # Remove other attributes
-    type(mock_result).text_content = PropertyMock(side_effect=AttributeError)
-    type(mock_result).text = PropertyMock(side_effect=AttributeError)
-    type(mock_result).content = PropertyMock(side_effect=AttributeError)
 
     mock_converter = MagicMock()
     mock_converter.convert.return_value = mock_result
@@ -187,12 +181,9 @@ def test_convert_file_to_text_content_attribute(mock_markitdown):
     """Test conversion with .content attribute."""
     uploaded_file = MockUploadedFile("test.docx", b"fake docx content")
 
-    mock_result = MagicMock()
+    # Create a mock result with only .content attribute
+    mock_result = MagicMock(spec=['content'])
     mock_result.content = "Content attribute"
-    # Remove other attributes
-    type(mock_result).text_content = PropertyMock(side_effect=AttributeError)
-    type(mock_result).text = PropertyMock(side_effect=AttributeError)
-    type(mock_result).markdown = PropertyMock(side_effect=AttributeError)
 
     mock_converter = MagicMock()
     mock_converter.convert.return_value = mock_result
