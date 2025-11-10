@@ -516,7 +516,7 @@ class PECSLearningPage:
         ui.notify('Flashcard added!', color='positive', position='top')
         ui.navigate.reload()
 
-    async def _generate_ai_flashcards(self):
+    async def _generate_ai_flashcards(self, existing_suggestions=None):
         """Generate flashcard suggestions using AI"""
         engage_data = self.section.pecs_data.get('engage_explain', {})
         explanation = engage_data.get('explanation', '')
@@ -547,25 +547,15 @@ class PECSLearningPage:
                 self.llm_service.suggest_flashcards,
                 chunk_text=self.section.content,
                 user_explanation=explanation,
-                user_challenges=challenge_data.get('critical_questions', '')
+                user_challenges=challenge_data.get('critical_questions', ''),
+                existing_cards=existing_suggestions or []
             )
 
             loading_dialog.close()
 
             if suggestions:
-                with ui.dialog() as dialog, ui.card().classes('max-w-2xl'):
-                    ui.label('AI Flashcard Suggestions').classes('text-xl font-bold mb-3')
-                    for i, suggestion in enumerate(suggestions, 1):
-                        with ui.card().classes('w-full mb-2 bg-purple-50'):
-                            ui.label(f'Suggestion {i}').classes('font-semibold mb-2')
-                            ui.label(f'Q: {suggestion["question"]}').classes('text-sm mb-1')
-                            ui.label(f'A: {suggestion["answer"]}').classes('text-sm mb-2')
-                            ui.button(
-                                'Add This Card',
-                                on_click=lambda s=suggestion: self._add_ai_flashcard(s, dialog)
-                            ).classes('bg-blue-500 text-sm')
-                    ui.button('Close', on_click=dialog.close).classes('mt-4')
-                dialog.open()
+                # Open interactive dialog
+                await self._show_flashcard_dialog(suggestions, existing_suggestions or [])
             else:
                 ui.notify('No suggestions available', color='warning', position='top')
 
@@ -573,8 +563,86 @@ class PECSLearningPage:
             loading_dialog.close()
             ui.notify(f'Error: {str(e)}', color='negative', position='top')
 
+    async def _show_flashcard_dialog(self, new_suggestions: list, previous_suggestions: list = None):
+        """Show interactive flashcard dialog that stays open"""
+        if previous_suggestions is None:
+            previous_suggestions = []
+
+        # Combine all suggestions
+        all_suggestions = previous_suggestions + new_suggestions
+        added_indices = set()  # Track which cards have been added
+
+        with ui.dialog() as dialog, ui.card().classes('max-w-3xl'):
+            ui.label('AI Flashcard Suggestions').classes('text-xl font-bold mb-3')
+
+            # Container for suggestions (will be updated)
+            suggestions_container = ui.column().classes('w-full')
+
+            def render_suggestions():
+                """Render all suggestions with their current state"""
+                suggestions_container.clear()
+                with suggestions_container:
+                    for i, suggestion in enumerate(all_suggestions):
+                        is_added = i in added_indices
+                        card_class = 'w-full mb-2 bg-green-50' if is_added else 'w-full mb-2 bg-purple-50'
+
+                        with ui.card().classes(card_class):
+                            ui.label(f'Card {i + 1}').classes('font-semibold mb-2')
+                            ui.label(f'Q: {suggestion["question"]}').classes('text-sm mb-1')
+                            ui.label(f'A: {suggestion["answer"]}').classes('text-sm mb-2')
+
+                            if is_added:
+                                ui.label('✓ Added to deck').classes('text-green-600 text-sm font-semibold')
+                            else:
+                                def make_add_handler(idx, sug):
+                                    def handler():
+                                        # Add to database
+                                        self.db.create_flashcard(
+                                            project_id=self.section.project_id,
+                                            question=sug['question'],
+                                            answer=sug['answer'],
+                                            section_id=self.section_id
+                                        )
+                                        added_indices.add(idx)
+                                        ui.notify('Flashcard added!', color='positive', position='top')
+                                        render_suggestions()  # Re-render to update UI
+                                    return handler
+
+                                ui.button(
+                                    'Add This Card',
+                                    on_click=make_add_handler(i, suggestion)
+                                ).classes('bg-blue-500 text-sm')
+
+            # Initial render
+            render_suggestions()
+
+            # Action buttons at bottom
+            with ui.row().classes('w-full gap-2 mt-4'):
+                async def generate_more():
+                    dialog.close()
+                    await self._generate_ai_flashcards(existing_suggestions=all_suggestions)
+
+                ui.button(
+                    'Generate More',
+                    icon='add_circle',
+                    on_click=generate_more
+                ).classes('bg-purple-500')
+
+                def close_and_reload():
+                    dialog.close()
+                    if added_indices:
+                        ui.navigate.reload()
+
+                ui.button(
+                    'Done',
+                    icon='check',
+                    on_click=close_and_reload
+                ).classes('bg-green-500')
+
+        dialog.open()
+
     def _add_ai_flashcard(self, suggestion: dict, dialog):
-        """Add AI-suggested flashcard"""
+        """Add AI-suggested flashcard (legacy method - no longer used)"""
         self.db.create_flashcard(
             project_id=self.section.project_id,
             question=suggestion['question'],

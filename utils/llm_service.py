@@ -234,31 +234,41 @@ class LLMService:
         """Get feedback on explanation simplicity and clarity."""
         return self.analyze_explanation("", explanation)  # Reuse explanation analysis
 
-    def suggest_flashcards(self, chunk_text: str, user_explanation: str, user_challenges: str) -> Optional[List[Dict[str, str]]]:
+    def suggest_flashcards(self, chunk_text: str, user_explanation: str, user_challenges: str, existing_cards: List[Dict[str, str]] = None) -> Optional[List[Dict[str, str]]]:
         """Suggest flashcard Q/A pairs based on the material and user's understanding."""
         if not self.is_available():
             logger.warning("LLM service is not available. Please check your API key configuration.")
             return None
 
         try:
-            prompt = f"""Based on the following learning material and the user's understanding, 
+            # Build existing cards context if provided
+            existing_context = ""
+            if existing_cards and len(existing_cards) > 0:
+                existing_context = "\n\nPreviously suggested flashcards (DO NOT duplicate these):\n"
+                for i, card in enumerate(existing_cards, 1):
+                    existing_context += f"{i}. Q: {card['question']}\n   A: {card['answer']}\n"
+                existing_context += "\nGenerate NEW flashcards on different aspects of the material."
+
+            prompt = f"""Based on the following learning material and the user's understanding,
             suggest 2-3 high-quality flashcard Q/A pairs that would help reinforce key concepts.
-            
+
             Original Material:
-            {chunk_text}
-            
+            {chunk_text[:1500]}...
+
             User's Explanation:
             {user_explanation}
-            
+
             User's Challenges/Questions:
             {user_challenges}
-            
+            {existing_context}
+
             For each flashcard:
             1. Question should be clear and test understanding
             2. Answer should be concise but complete
             3. Focus on key concepts and relationships
             4. Avoid trivial or obvious questions
-            
+            5. DO NOT duplicate existing flashcards if provided above
+
             Return the response as a JSON array of objects, each with 'question' and 'answer' fields."""
 
             response = self.client.chat.completions.create(
