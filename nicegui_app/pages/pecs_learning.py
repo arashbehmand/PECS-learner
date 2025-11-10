@@ -541,25 +541,41 @@ class PECSLearningPage:
         try:
             challenge_data = self.section.pecs_data.get('challenge_connect', {})
 
+            # Get existing flashcards from database to avoid duplicates
+            db_flashcards = self.db.get_flashcards_by_project(self.section.project_id, self.section_id)
+            existing_db_cards = [{'question': card.question, 'answer': card.answer} for card in db_flashcards]
+
+            # Combine database cards with previous suggestions
+            all_existing_cards = existing_db_cards + (existing_suggestions or [])
+
             # Run LLM call in thread pool to avoid blocking UI
             import asyncio
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Generating flashcards. Existing DB cards: {len(existing_db_cards)}, Previous suggestions: {len(existing_suggestions or [])}")
+
             suggestions = await asyncio.to_thread(
                 self.llm_service.suggest_flashcards,
                 chunk_text=self.section.content,
                 user_explanation=explanation,
                 user_challenges=challenge_data.get('critical_questions', ''),
-                existing_cards=existing_suggestions or []
+                existing_cards=all_existing_cards
             )
 
             loading_dialog.close()
 
             if suggestions:
+                logger.info(f"Generated {len(suggestions)} new flashcard suggestions")
                 # Open interactive dialog
                 await self._show_flashcard_dialog(suggestions, existing_suggestions or [])
             else:
+                logger.warning("No flashcard suggestions generated")
                 ui.notify('No suggestions available', color='warning', position='top')
 
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f'Error generating flashcards: {str(e)}', exc_info=True)
             loading_dialog.close()
             ui.notify(f'Error: {str(e)}', color='negative', position='top')
 

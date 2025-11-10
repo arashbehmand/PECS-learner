@@ -11,9 +11,42 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import json
+import logging
 from nicegui import ui, app
 from utils.database import DatabaseRepository
 from nicegui_app import config
+
+# ===== LOGGING SETUP =====
+def setup_logging():
+    """Configure logging for the application"""
+    # Create logs directory
+    logs_dir = Path(__file__).parent.parent / "logs"
+    logs_dir.mkdir(exist_ok=True)
+
+    # Configure root logger
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            # Console handler - shows in terminal
+            logging.StreamHandler(sys.stdout),
+            # File handler - saves to file
+            logging.FileHandler(logs_dir / "pecs_learning.log", mode='a')
+        ]
+    )
+
+    # Set specific loggers to appropriate levels
+    logging.getLogger('nicegui').setLevel(logging.WARNING)  # Reduce NiceGUI noise
+    logging.getLogger('uvicorn').setLevel(logging.INFO)
+    logging.getLogger('utils').setLevel(logging.DEBUG)  # Our code - verbose
+    logging.getLogger('nicegui_app').setLevel(logging.DEBUG)  # Our code - verbose
+
+    logger = logging.getLogger(__name__)
+    logger.info("Logging initialized - output to console and logs/pecs_learning.log")
+    return logger
+
+# Initialize logging first
+logger = setup_logging()
 
 # Initialize database (singleton pattern)
 _db_instance = None

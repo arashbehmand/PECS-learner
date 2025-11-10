@@ -228,6 +228,41 @@ pytest --cov=utils --cov-report=html
 pytest tests/test_database.py
 ```
 
+## 📋 Logging and Debugging
+
+The application logs to both the console and a log file for easy debugging:
+
+**Log Locations:**
+- **Console**: All logs appear in the terminal where you run the app
+- **File**: `logs/pecs_learning.log` (created automatically)
+
+**Log Levels:**
+- `INFO`: General application flow and important events
+- `DEBUG`: Detailed debugging info (LLM calls, database operations)
+- `WARNING`: Potential issues
+- `ERROR`: Errors with full stack traces
+
+**Viewing Logs:**
+```bash
+# Watch logs in real-time
+tail -f logs/pecs_learning.log
+
+# View recent errors only
+grep ERROR logs/pecs_learning.log
+
+# View all LLM-related logs
+grep "llm_service" logs/pecs_learning.log
+```
+
+**What Gets Logged:**
+- LLM API calls and responses
+- Flashcard generation attempts
+- Database operations
+- Page navigation
+- Errors with full stack traces
+
+This makes debugging much easier - if something fails, check the logs!
+
 ## 🔄 Migration from Old Format
 
 If you have old JSON session files, you can migrate them:
