@@ -1,39 +1,47 @@
 # P.E.C.S. Learning System 📚
 
-A production-grade, database-backed learning application that guides users through a structured learning methodology (Prime, Engage, Challenge, Solidify) for any text material—from articles to entire books.
+A production-grade, PWA-enabled learning application built with NiceGUI that guides users through a structured learning methodology (Prime, Engage, Challenge, Solidify) for any text material—from articles to entire books.
 
-![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
-![Streamlit](https://img.shields.io/badge/streamlit-1.32+-red.svg)
-![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0+-green.svg)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+**✨ Pure NiceGUI Architecture**
+- ✅ Mobile-responsive PWA (installable on any device)
+- ✅ No page reloads - smooth, app-like experience
+- ✅ URL-based routing - bookmarkable links
+- ✅ Multi-user ready architecture
+- ✅ Comprehensive test coverage
+
+![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![NiceGUI](https://img.shields.io/badge/NiceGUI-1.4+-green.svg)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0+-orange.svg)
+![PWA](https://img.shields.io/badge/PWA-Ready-purple.svg)
+![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)
 
 ## 🎯 Features
 
 ### Core Features
-- **📚 Multi-Project Support**: Create and manage multiple study projects (e.g., one per book)
+- **📚 Multi-Project Support**: Create and manage multiple study projects
 - **📄 Multi-Format Support**: Import from Text, Markdown, EPUB, PDF, and Word documents
-- **🔍 Hierarchical Content Processing**: Automatically detects chapters, sections, and headings in your text
-- **💾 Automatic Persistence**: All progress saved automatically to SQLite database—never lose your work
-- **📑 Scalable Navigation**: Handle hundreds of sections with search and pagination
-- **📊 Progress Tracking**: Visual indicators for completed sections and flashcard statistics
+- **🔍 Hierarchical Content Processing**: Automatically detects chapters and sections
+- **💾 Automatic Persistence**: All progress saved to SQLite database
+- **📑 Scalable Navigation**: Handle hundreds of sections efficiently
+- **📊 Progress Tracking**: Visual indicators for completion and statistics
 
-### P.E.C.S. Learning Phases (Tabbed Interface)
-- **P - Prime & Preview**: Initial skimming and preparation
-- **E - Engage & Explain**: Deep reading and explanation in your own words
+### P.E.C.S. Learning Phases
+- **P - Prime & Preview**: First impressions and initial understanding
+- **E - Engage & Explain**: Deep reading with interactive AI conversation
 - **C - Challenge & Connect**: Critical thinking and making connections
-- **S - Solidify & Space**: Review and create flashcards for spaced repetition
+- **S - Solidify & Space**: Create flashcards for spaced repetition
 
 ### Interactive Study Mode
 - **🎴 Spaced Repetition**: SM-2 algorithm for optimal review scheduling
-- **📈 Self-Grading**: "I Knew It" / "Review Again" buttons for active recall
-- **🎯 Smart Filtering**: Study cards due for review, all cards, or mastered cards
-- **📊 Progress Statistics**: Track review counts, ease factors, and next review dates
+- **📈 Self-Grading**: "I Knew It" / "Review Again" buttons
+- **🎯 Smart Filtering**: Study due cards, all cards, or mastered cards
+- **📊 Progress Statistics**: Track reviews, ease factors, and intervals
 
 ### AI-Enhanced Features (Optional)
-- **✍️ Writing Coach**: Get AI feedback on explanation clarity and simplicity
-- **💡 Flashcard Assistant**: AI-generated flashcard suggestions based on your understanding
-- **🔍 Critical Analysis**: AI feedback on critical thinking and connections
-- **🎓 Learning Guidance**: Context-aware suggestions throughout all phases
+- **✍️ Context-Aware Feedback**: AI feedback based on your complete learning journey
+- **💡 Smart Flashcard Generation**: AI suggestions that avoid duplicates
+- **🔍 Critical Analysis**: AI feedback on thinking and connections
+- **📈 LLM Observability**: Optional Langfuse integration for tracking usage and costs
 
 ## 🚀 Quick Start
 
@@ -45,160 +53,204 @@ git clone <repository-url>
 cd PECS-learner
 
 # Start the application
-docker-compose up
+docker-compose up --build
 
-# Access at http://localhost:8501
+# Access at http://localhost:8080
+# Install as PWA: Click "Install" button in browser
 ```
 
 ### Option 2: Local Installation
 
 ```bash
-# Clone the repository
+# Clone and setup
 git clone <repository-url>
 cd PECS-learner
 
 # Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the application
-streamlit run app.py
+# Run application
+python nicegui_app/main.py
+
+# Access at http://localhost:8080
 ```
 
 ## 📋 Requirements
 
-- Python 3.10+
+- Python 3.11+
 - SQLite 3 (included with Python)
 - Optional: OpenAI API key for AI features
 
 ## ⚙️ Configuration
 
-### API Keys (Optional)
+### Environment Variables
 
-To enable AI features, create `.streamlit/secrets.toml`:
+Create a `.env` file in the project root:
 
-```toml
-[llm]
-openai_api_key = "your-openai-api-key-here"
+```bash
+# Server configuration
+HOST=0.0.0.0
+PORT=8080
+
+# AI Features (optional)
+OPENAI_API_KEY=your-key-here
+
+# LLM Observability (optional)
+LANGFUSE_PUBLIC_KEY=your-langfuse-public-key
+LANGFUSE_SECRET_KEY=your-langfuse-secret-key
+LANGFUSE_HOST=https://cloud.langfuse.com
+
+# Storage
+NICEGUI_STORAGE_PATH=./data/nicegui_storage
 ```
 
-**Note**: The application works perfectly without API keys—AI features are optional enhancements.
+### Langfuse Setup (Optional)
 
-You can get an OpenAI API key from: https://platform.openai.com/api-keys
+[Langfuse](https://langfuse.com/) provides observability for LLM calls:
+
+1. Sign up at https://cloud.langfuse.com
+2. Create a new project
+3. Copy your keys to `.env` file
+4. All LLM calls will be tracked automatically
+
+Benefits:
+- Track token usage and costs
+- Debug LLM responses
+- Monitor performance
+- Analyze conversation quality
 
 ## 📖 Usage Guide
 
 ### 1. Create a Project
-- Click "Create New Project" on the dashboard
-- Enter a name for your study project (e.g., "Python Programming Book")
+- Click "New Project" on dashboard
+- Enter a project name (e.g., "Python Programming")
 
 ### 2. Upload Content
-- Paste your text or upload a `.txt` or `.md` file
-- The system automatically detects chapters and sections
-- Configure processing options (min/max section size, overlap)
+- Click "Upload Content"
+- Paste text or upload file (.txt, .md, .epub, .pdf, .docx)
+- System automatically detects structure
 - Click "Process & Create Sections"
 
 ### 3. Learn with P.E.C.S.
-- Select a section from the sidebar
-- Navigate through the four tabs:
-  - **Prime**: Skim and prepare
-  - **Engage**: Read deeply and explain
-  - **Challenge**: Think critically and connect
-  - **Solidify**: Create flashcards and apply knowledge
-- Use "💾 Auto-save" buttons to save your progress
-- Mark sections as complete when finished
+- Select a section from project view
+- Work through the vertical learning flow:
+  - **Prime**: Record first impressions
+  - **Engage**: Explain in your own words (with AI conversation)
+  - **Challenge**: Think critically and make connections
+  - **Solidify**: Create flashcards and get completion summary
+- Progress unlocks sequentially
+- All work auto-saved to database
 
 ### 4. Study with Spaced Repetition
-- Navigate to "Study Mode"
-- Choose what to study: cards due for review, all cards, or mastered cards
-- Review flashcards one at a time
-- Self-grade: "I Knew It" or "Review Again"
-- The system schedules next reviews based on your performance
+- Click "Study Mode" from project view
+- Review flashcards with self-grading
+- System schedules optimal review intervals
 
 ## 🗂️ Project Structure
 
 ```
 PECS-learner/
-├── app.py                      # Main application entry point
-├── requirements.txt            # Python dependencies
-├── Dockerfile                  # Docker configuration
-├── docker-compose.yml         # Docker Compose setup
-├── pytest.ini                 # Test configuration
-├── README.md                   # This file
-├── BLUEPRINT.md                # Technical architecture documentation
-├── .streamlit/
-│   ├── secrets.toml           # API keys (create from example)
-│   └── secrets.toml.example   # Example secrets file
-├── components/
-│   ├── project_dashboard.py   # Multi-project dashboard
-│   ├── content_upload_new.py  # Content import with hierarchical processing
-│   ├── section_navigator.py   # Section navigation sidebar
-│   ├── pecs_tabs.py           # Unified PECS interface (tabs)
-│   ├── study_mode.py           # Interactive study mode
-│   └── [legacy modules]       # Old components (preserved for reference)
-├── utils/
-│   ├── database.py             # Database repository layer
-│   ├── models.py               # SQLAlchemy ORM models
-│   ├── hierarchical_processor.py  # Intelligent section detection
-│   ├── content_processor.py    # Basic text loading
-│   ├── llm_service.py          # AI integration
-│   ├── migration.py            # JSON import utility
-│   ├── prompts.yaml            # AI prompt templates
-│   └── [legacy modules]        # Old utilities
-├── tests/
-│   ├── test_database.py        # Database tests
-│   └── test_hierarchical_processor.py  # Content processing tests
-└── data/                       # SQLite database (created automatically)
-    └── pecs.db
+├── nicegui_app/              # Main NiceGUI application
+│   ├── main.py              # Entry point with PWA setup
+│   ├── config.py            # Configuration
+│   ├── pages/               # Page implementations
+│   │   ├── dashboard.py     # Project dashboard
+│   │   ├── content_upload.py
+│   │   ├── project_view.py
+│   │   ├── pecs_learning.py # Core learning interface
+│   │   └── study_mode.py    # Flashcard practice
+│   └── static/              # PWA assets (icons, manifest)
+├── utils/                    # Shared utilities
+│   ├── database.py          # SQLAlchemy repository
+│   ├── models.py            # ORM models
+│   ├── llm_service.py       # AI integration
+│   ├── context_builder.py   # DRY context engineering
+│   ├── hierarchical_processor.py
+│   ├── file_converters.py
+│   └── migration.py         # JSON import utility
+├── tests/                    # Test suite (56 tests)
+│   ├── test_database.py
+│   ├── test_llm_service.py
+│   ├── test_context_builder.py
+│   ├── test_file_converters.py
+│   └── ...
+├── data/                     # SQLite database (auto-created)
+├── logs/                     # Application logs
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── pytest.ini
+├── BLUEPRINT.md             # Technical architecture
+├── TESTING.md               # Test documentation
+└── README.md               # This file
 ```
 
 ## 🧪 Testing
 
-Run the test suite:
+Run the comprehensive test suite:
 
 ```bash
 # Run all tests
 pytest
 
-# With coverage
-pytest --cov=utils --cov-report=html
+# With coverage report
+pytest --cov=utils --cov-report=term-missing
 
 # Specific test file
-pytest tests/test_database.py
+pytest tests/test_context_builder.py -v
+
+# Run fast tests only (excludes langchain-dependent)
+pytest tests/test_llm_service.py tests/test_context_builder.py tests/test_database.py
 ```
 
-## 🔄 Migration from Old Format
+**Test Coverage:**
+- 56 tests passing
+- Context builder: 100% coverage
+- File converters: 87% coverage
+- Database operations: 62% coverage
+- LLM service: 52% coverage
 
-If you have old JSON session files, you can migrate them:
+See `TESTING.md` for detailed test documentation.
 
-1. In the application, navigate to the migration section
-2. Upload your old `pecs_session.json` file
-3. Specify a project name
-4. Click "Import Session"
+## 📋 Logging and Debugging
 
-All your old chunks, notes, and flashcards will be converted to the new database format.
+Comprehensive logging to both console and file:
 
-## 🐳 Docker Details
+**Log Locations:**
+- **Console**: Terminal output
+- **File**: `logs/pecs_learning.log` (auto-created)
 
-### Build Image
+**Log Levels:**
+- `INFO`: Application flow and events
+- `DEBUG`: LLM calls, database operations
+- `WARNING`: Potential issues
+- `ERROR`: Errors with stack traces
+
+**Viewing Logs:**
 ```bash
-docker build -t pecs-learner .
+# Watch logs in real-time
+tail -f logs/pecs_learning.log
+
+# View errors only
+grep ERROR logs/pecs_learning.log
+
+# View LLM activity
+grep "llm_service" logs/pecs_learning.log
 ```
 
-### Run Container
-```bash
-docker run -p 8501:8501 -v $(pwd)/data:/app/data pecs-learner
-```
+## 🐳 Docker Usage
 
-### Docker Compose
-```bash
-# Start
-docker-compose up
+### Local Development
 
-# Start in background
+```bash
+# Build and start
+docker-compose up --build
+
+# Run in background
 docker-compose up -d
 
 # View logs
@@ -208,72 +260,144 @@ docker-compose logs -f
 docker-compose down
 ```
 
-**Important**: The `data/` directory is mounted as a volume to persist your database across container restarts.
+The `data/` directory is mounted as a volume for database persistence.
+
+### Production Deployment
+
+Deploy to any platform that supports Docker:
+
+**Recommended Platforms:**
+
+1. **Railway** (Easiest)
+   - Free tier: 500 hours/month
+   - Automatic HTTPS
+   - One-click deploy
+   ```bash
+   railway login
+   railway init
+   railway up
+   ```
+
+2. **Render** (Free tier with sleep)
+   - Connect GitHub repo
+   - Auto-deploy on push
+   - Free tier available
+
+3. **DigitalOcean App Platform** ($5/month)
+   - Always-on
+   - Easy scaling
+   - Reliable
+
+4. **Self-hosted VPS** ($5/month)
+   - Full control
+   - Use Caddy for automatic HTTPS
+   ```bash
+   # Install Docker on Ubuntu
+   curl -fsSL https://get.docker.com | sh
+
+   # Clone and run
+   git clone <repo>
+   cd PECS-learner
+   docker-compose up -d
+   ```
+
+**Environment Variables for Production:**
+```bash
+OPENAI_API_KEY=your-key
+NICEGUI_STORAGE_PATH=/app/data/nicegui_storage
+PORT=8080
+```
+
+**Making it a PWA:**
+The app is already configured as a PWA! Users can install it on any device:
+
+- **iPhone/iPad**: Share → Add to Home Screen
+- **Android**: Menu → Install app
+- **Desktop**: Click install icon in address bar
 
 ## 🏗️ Architecture Highlights
 
+### DRY (Don't Repeat Yourself) Principles
+- **Context Engineering**: Single source of truth for AI context via `context_builder.py`
+- **Phase Rendering**: Generic renderer for all learning phases
+- **Format Functions**: Separate formatters for different use cases
+
 ### Database-First Design
-- **Scalability**: Handles book-length materials with hundreds of sections
-- **Persistence**: All data automatically saved to SQLite
-- **Performance**: Indexed queries for fast navigation
+- **Scalability**: Handles book-length materials
+- **Persistence**: Automatic SQLite storage
+- **Performance**: Indexed queries
 
-### Hierarchical Content Processing
-- Intelligent detection of chapters, sections, and headings
-- Maintains document structure instead of flat chunking
-- Configurable processing parameters
+### Smart AI Context
+- Includes full learning journey (all phases)
+- ONLY committed flashcards (prevents duplicates)
+- Conversation history when needed
+- Clear visual separators for AI comprehension
 
-### Modern UI/UX
-- Tabbed interface for non-linear PECS workflow
-- Interactive study mode with spaced repetition
-- Responsive design with efficient navigation
+### Testing Strategy
+- Unit tests for utilities
+- Integration tests for workflows
+- Mock-based LLM testing
+- 100% coverage on critical modules
+
+## 🔄 Migration from Old Format
+
+If you have old JSON session files:
+
+1. Navigate to dashboard
+2. Look for migration option
+3. Upload `pecs_session.json`
+4. Specify project name
+5. Click "Import"
+
+All chunks, notes, and flashcards will be migrated to the new database.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions welcome! Please:
 
-### Development Setup
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests for new functionality
-5. Update BLUEPRINT.md if architecture changes
+4. Add tests (see `TESTING.md`)
+5. Update `BLUEPRINT.md` if needed
 6. Submit a pull request
 
 ## 📝 License
 
-[Add your chosen license here]
+MIT License - See LICENSE file for details
 
 ## 🙏 Acknowledgments
 
-- Built with [Streamlit](https://streamlit.io/)
-- Uses [SQLAlchemy](https://www.sqlalchemy.org/) for database operations
-- AI integration via [OpenAI](https://openai.com/)
-- Text processing with [LangChain](https://www.langchain.com/)
+- Built with [NiceGUI](https://nicegui.io/)
+- Database: [SQLAlchemy](https://www.sqlalchemy.org/)
+- AI: [OpenAI](https://openai.com/)
+- File conversion: [markitdown](https://github.com/microsoft/markitdown)
+- Testing: [pytest](https://pytest.org/)
 
 ## 📚 Documentation
 
-- **Technical Architecture**: See `BLUEPRINT.md` for detailed system design
-- **Code Documentation**: Inline docstrings follow Google style
-- **API Documentation**: Database schema and repository methods documented in `utils/database.py`
+- **Architecture**: `BLUEPRINT.md` - Complete system design
+- **Testing**: `TESTING.md` - Test coverage and strategies
+- **Code**: Inline docstrings (Google style)
+- **API**: Database methods documented in `utils/database.py`
 
-## 🐛 Known Issues & Limitations
+## 🐛 Known Limitations
 
-- Large text files (>100MB) may take time to process
-- Markdown rendering in content areas is basic (plain text display)
-- AI features require internet connection and API key
+- Large files (>100MB) may take time to process
+- AI features require internet connection
+- Pre-alpha: No backward compatibility guaranteed
 
 ## 🔮 Roadmap
 
-- [ ] Export flashcards to Anki/Quizlet format
-- [ ] Collaborative study groups
+- [ ] Export flashcards to Anki/Quizlet
 - [ ] Advanced analytics dashboard
-- [ ] Mobile-responsive improvements
 - [ ] Multiple LLM provider support
 - [ ] Custom prompt template editor
-- [ ] Backup/restore functionality
+- [ ] Authentication & multi-user support
+- [ ] Collaborative study groups
 
 ---
 
 **Made with ❤️ for deep, structured learning**
 
-For questions, issues, or feature requests, please open an issue on GitHub.
+For questions or issues, please open a GitHub issue.
