@@ -16,7 +16,4 @@ markitdown>=0.0.1a9
 pytest>=7.4.0
 pytest-cov>=4.1.0
 
-# Legacy (for backward compatibility during migration)
-streamlit>=1.32.0 
-
 markitdown[all]
