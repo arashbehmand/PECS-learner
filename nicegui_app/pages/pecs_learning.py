@@ -106,6 +106,43 @@ class PECSLearningPage:
             self._render_challenge_phase()
             self._render_solidify_phase()
 
+            # Render completion report if it exists (persistent, not dialog)
+            self._render_completion_report()
+
+    def _render_completion_report(self):
+        """Render the completion report card (persistent, not a dialog)"""
+        pecs_data = self.section.pecs_data or {}
+        solidify_data = pecs_data.get('solidify_space', {})
+        completion_report = solidify_data.get('completion_report')
+        completed_at = solidify_data.get('completed_at')
+
+        if not completion_report:
+            return  # Don't show anything if no report exists yet
+
+        # Show completion report card
+        with ui.card().classes('w-full p-6 bg-gradient-to-r from-green-50 to-blue-50 border-l-4 border-green-500'):
+            with ui.row().classes('w-full items-center gap-2 mb-4'):
+                ui.icon('celebration', size='md').classes('text-green-600')
+                ui.label('Learning Summary').classes('text-2xl font-bold flex-1')
+                if completed_at:
+                    from datetime import datetime
+                    completed_date = datetime.fromisoformat(completed_at).strftime('%B %d, %Y at %I:%M %p')
+                    ui.label(f'Completed: {completed_date}').classes('text-sm text-gray-600')
+
+            with ui.expansion('View your AI-generated learning summary', icon='insights').classes('w-full'):
+                with ui.scroll_area().classes('w-full max-h-96'):
+                    ui.markdown(completion_report).classes('text-sm prose max-w-none')
+
+                # Regenerate button
+                async def regenerate():
+                    await self._generate_completion_report()
+
+                ui.button(
+                    'Regenerate Summary',
+                    icon='refresh',
+                    on_click=regenerate
+                ).classes('bg-blue-500 mt-4')
+
     def _render_progress_indicator(self):
         """Render progress bar showing current phase"""
         phases = ['Prime', 'Engage', 'Challenge', 'Solidify']
@@ -915,37 +952,44 @@ Be helpful and direct, not artificially enthusiastic."""
             ui.notify(f'Error: {str(e)}', color='negative', position='top')
 
     async def _generate_completion_report(self):
-        """Generate AI summary of the learner's journey through this section"""
-        # Gather all phase data
-        all_pecs_data = self.section.pecs_data or {}
+        """Generate AI summary of the learner's journey through this section (uses DRY context builder)"""
+        import logging
+        logger = logging.getLogger(__name__)
 
-        # Build comprehensive summary of learner's work
-        summary_text = f"Section: {self.section.title or 'Untitled'}\n\n"
-        summary_text += f"Content:\n{self.section.content[:500]}...\n\n"
+        # Use the DRY context builder with full context (including conversations and flashcards)
+        context = self._build_learning_context(include_flashcards=True, include_conversations=True)
 
-        for phase_key, phase_name in [
-            ('prime_preview', 'Prime & Preview'),
-            ('engage_explain', 'Engage & Explain'),
-            ('challenge_connect', 'Challenge & Connect'),
-            ('solidify_space', 'Solidify & Space')
-        ]:
-            phase_data = all_pecs_data.get(phase_key, {})
-            summary_text += f"\n=== {phase_name} ===\n"
+        # Build comprehensive summary text
+        summary_parts = []
+        summary_parts.append(f"Section: {self.section.title or 'Untitled'}")
+        summary_parts.append(f"\nLearning Material:\n{self.section.content[:500]}...\n")
 
-            # Add user inputs
-            if phase_key == 'prime_preview' and phase_data.get('understanding'):
-                summary_text += f"First impressions: {phase_data['understanding']}\n"
-            elif phase_key == 'engage_explain' and phase_data.get('explanation'):
-                summary_text += f"Explanation: {phase_data['explanation']}\n"
-            elif phase_key == 'challenge_connect' and phase_data.get('critical_questions'):
-                summary_text += f"Questions & connections: {phase_data['critical_questions']}\n"
+        if context.get('understanding'):
+            summary_parts.append(f"\n=== Prime & Preview ===")
+            summary_parts.append(f"First impressions: {context['understanding']}")
+            if context.get('conversations', {}).get('prime'):
+                conv = context['conversations']['prime']
+                summary_parts.append(f"AI conversation: {len(conv)//2} exchanges")
 
-            # Add conversation snippets
-            conversation = phase_data.get('ai_conversation', [])
-            if conversation:
-                summary_text += f"Conversation ({len(conversation)//2} exchanges):\n"
-                for msg in conversation[-4:]:  # Last 2 exchanges
-                    summary_text += f"  {msg['role']}: {msg['content'][:100]}...\n"
+        if context.get('explanation'):
+            summary_parts.append(f"\n=== Engage & Explain ===")
+            summary_parts.append(f"Explanation: {context['explanation']}")
+            if context.get('conversations', {}).get('engage'):
+                conv = context['conversations']['engage']
+                summary_parts.append(f"AI conversation: {len(conv)//2} exchanges")
+
+        if context.get('critical_thinking'):
+            summary_parts.append(f"\n=== Challenge & Connect ===")
+            summary_parts.append(f"Questions & connections: {context['critical_thinking']}")
+            if context.get('conversations', {}).get('challenge'):
+                conv = context['conversations']['challenge']
+                summary_parts.append(f"AI conversation: {len(conv)//2} exchanges")
+
+        if context.get('flashcards'):
+            summary_parts.append(f"\n=== Solidify & Space ===")
+            summary_parts.append(f"Created {len(context['flashcards'])} flashcards")
+
+        summary_text = "\n".join(summary_parts)
 
         # Create prompt for AI summary
         prompt = f"""Review this learner's journey through a learning section using the PECS method.
@@ -962,6 +1006,8 @@ Provide an objective summary that:
 5. Suggests next steps if relevant
 
 Be analytical and honest. Don't be overly enthusiastic or artificially encouraging. Write like a thoughtful reviewer, not a cheerleader."""
+
+        logger.info(f"Generating completion report with {len(summary_text)} chars of context")
 
         # Show loading
         with ui.dialog() as dialog, ui.card().classes('max-w-3xl'):
@@ -983,23 +1029,22 @@ Be analytical and honest. Don't be overly enthusiastic or artificially encouragi
             dialog.close()
 
             if report:
-                # Save report to section
-                section_pecs_data = self.section.pecs_data or {}
-                section_pecs_data['completion_report'] = report
+                import logging
+                logger = logging.getLogger(__name__)
+
+                # Save report inside solidify_space (proper storage location)
                 from datetime import datetime
-                section_pecs_data['completed_at'] = datetime.now().isoformat()
+                solidify_data = self.section.pecs_data.get('solidify_space', {})
+                solidify_data['completion_report'] = report
+                solidify_data['completed_at'] = datetime.now().isoformat()
 
-                # Need to store the entire updated pecs_data back
-                self.section.pecs_data = section_pecs_data
-                self.db.update_section_pecs_data(self.section_id, 'solidify_space', self.section.pecs_data['solidify_space'])
+                # Save to database
+                self.db.update_section_pecs_data(self.section_id, 'solidify_space', solidify_data)
+                logger.info(f"Completion report saved ({len(report)} chars)")
 
-                # Show report in a nice dialog
-                with ui.dialog() as report_dialog, ui.card().classes('max-w-3xl'):
-                    ui.label('Section Review').classes('text-2xl font-bold mb-4')
-                    with ui.scroll_area().classes('w-full h-96'):
-                        ui.markdown(report).classes('text-sm')
-                    ui.button('Close', on_click=lambda: [report_dialog.close(), ui.navigate.reload()]).classes('bg-blue-500 mt-4')
-                report_dialog.open()
+                # Reload to show the persistent card
+                ui.notify('Learning summary generated!', color='positive', position='top')
+                ui.navigate.reload()
             else:
                 ui.notify('Section completed!', color='positive', position='top')
                 ui.navigate.reload()
