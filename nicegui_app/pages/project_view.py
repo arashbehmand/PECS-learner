@@ -4,9 +4,12 @@ Project View Page - Shows project overview and section list
 """
 
 from nicegui import ui
+from pathlib import Path
+from datetime import datetime
 
 from utils.database import DatabaseRepository
 from utils.models import Section
+from utils.anki_export import export_flashcards_to_anki
 
 
 class ProjectViewPage:
@@ -108,6 +111,13 @@ class ProjectViewPage:
                         f"/project/{self.project_id}/upload"
                     ),
                 ).classes("bg-blue-500 flex-1 min-w-40")
+
+                if stats.get("total_flashcards", 0) > 0:
+                    ui.button(
+                        "Export to Anki",
+                        icon="download",
+                        on_click=lambda: self._show_anki_export_dialog(),
+                    ).classes("bg-purple-500 flex-1 min-w-40")
 
         # Sections list
         if not self.sections:
@@ -240,3 +250,183 @@ class ProjectViewPage:
                         f"/project/{self.project_id}/section/{s.id}"
                     ),
                 ).props("flat dense").classes("text-blue-500")
+
+    def _show_anki_export_dialog(self):
+        """Show dialog for Anki export options"""
+
+        with ui.dialog() as dialog, ui.card().classes("w-full max-w-2xl"):
+            ui.label("Export Flashcards to Anki").classes("text-xl font-bold mb-4")
+
+            # Get flashcard count
+            flashcards = self.db.get_flashcards_by_project(self.project_id)
+            total_cards = len(flashcards)
+
+            ui.label(
+                f"Ready to export {total_cards} flashcard{'s' if total_cards != 1 else ''}"
+            ).classes("text-gray-700 mb-4")
+
+            # Export method selection
+            ui.label("Choose export method:").classes("font-semibold mb-2")
+
+            export_method = {"value": "api"}
+
+            with ui.row().classes("gap-4 mb-6"):
+                with ui.card().classes("flex-1 p-4 cursor-pointer"):
+                    with ui.column():
+                        with ui.row().classes("items-center gap-2 mb-2"):
+                            ui.radio(
+                                ["api"],
+                                value="api",
+                                on_change=lambda e: export_method.update({"value": "api"}),
+                            ).props("dense").classes("m-0")
+                            ui.icon("cloud_upload").classes("text-blue-500 text-2xl")
+                            ui.label("AnkiConnect (Direct)").classes("font-semibold")
+
+                        ui.label(
+                            "Push cards directly to Anki via API"
+                        ).classes("text-sm text-gray-600")
+                        ui.label(
+                            "Requires: Anki running with AnkiConnect add-on"
+                        ).classes("text-xs text-orange-600 mt-1")
+
+                with ui.card().classes("flex-1 p-4 cursor-pointer"):
+                    with ui.column():
+                        with ui.row().classes("items-center gap-2 mb-2"):
+                            ui.radio(
+                                ["file"],
+                                value="file",
+                                on_change=lambda e: export_method.update({"value": "file"}),
+                            ).props("dense").classes("m-0")
+                            ui.icon("download").classes("text-green-500 text-2xl")
+                            ui.label("File Export").classes("font-semibold")
+
+                        ui.label(
+                            "Download .txt file for manual import"
+                        ).classes("text-sm text-gray-600")
+                        ui.label(
+                            "No setup required - works offline"
+                        ).classes("text-xs text-green-600 mt-1")
+
+            # Deck name input
+            deck_name_input = ui.input(
+                label="Anki Deck Name",
+                value=self.project.name,
+                placeholder="Enter deck name"
+            ).classes("w-full mb-4")
+
+            # Status message area
+            status_container = ui.column().classes("w-full mb-4")
+
+            def perform_export():
+                """Execute the export based on selected method"""
+                status_container.clear()
+
+                deck_name = deck_name_input.value or self.project.name
+
+                with status_container:
+                    with ui.row().classes("items-center gap-2"):
+                        ui.spinner(size="sm")
+                        ui.label("Exporting...").classes("text-gray-600")
+
+                # Give UI time to update
+                ui.timer(0.1, lambda: _do_export(deck_name), once=True)
+
+            def _do_export(deck_name: str):
+                """Perform the actual export"""
+                method = export_method["value"]
+
+                if method == "api":
+                    result = export_flashcards_to_anki(
+                        flashcards=flashcards,
+                        deck_name=deck_name,
+                        method="api",
+                        tags=["PECS", self.project.name]
+                    )
+                else:  # file
+                    # Generate filename
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    safe_deck_name = "".join(
+                        c if c.isalnum() or c in (" ", "-", "_") else "_"
+                        for c in deck_name
+                    )
+                    filename = f"{safe_deck_name}_{timestamp}.txt"
+                    output_path = Path("data") / "exports" / filename
+
+                    result = export_flashcards_to_anki(
+                        flashcards=flashcards,
+                        deck_name=deck_name,
+                        method="file",
+                        output_path=output_path,
+                        tags=["PECS", self.project.name]
+                    )
+
+                # Update status
+                status_container.clear()
+                with status_container:
+                    if result["success"]:
+                        with ui.card().classes("w-full bg-green-50 p-4"):
+                            with ui.row().classes("items-start gap-2"):
+                                ui.icon("check_circle").classes("text-green-500 text-2xl")
+                                with ui.column().classes("flex-1"):
+                                    ui.label("Success!").classes(
+                                        "font-bold text-green-700"
+                                    )
+                                    ui.label(result["message"]).classes("text-sm")
+
+                                    if method == "file" and "file_path" in result:
+                                        # Provide download link
+                                        file_path = result["file_path"]
+                                        ui.button(
+                                            "Download File",
+                                            icon="download",
+                                            on_click=lambda: ui.download(file_path)
+                                        ).classes("bg-green-500 mt-2")
+
+                        if method == "api":
+                            ui.label(
+                                "Open Anki to see your new cards!"
+                            ).classes("text-sm text-gray-600 mt-2")
+                        else:
+                            ui.label(
+                                "Import in Anki: File → Import → Select .txt file"
+                            ).classes("text-sm text-gray-600 mt-2")
+
+                    else:
+                        with ui.card().classes("w-full bg-red-50 p-4"):
+                            with ui.row().classes("items-start gap-2"):
+                                ui.icon("error").classes("text-red-500 text-2xl")
+                                with ui.column():
+                                    ui.label("Export Failed").classes(
+                                        "font-bold text-red-700"
+                                    )
+                                    ui.label(result["message"]).classes(
+                                        "text-sm text-red-600"
+                                    )
+
+                                    if method == "api":
+                                        with ui.column().classes("mt-2 text-xs"):
+                                            ui.label("Troubleshooting:").classes(
+                                                "font-semibold"
+                                            )
+                                            ui.label("1. Is Anki running?")
+                                            ui.label(
+                                                "2. Is AnkiConnect installed? (Code: 2055492159)"
+                                            )
+                                            ui.label(
+                                                "3. Try restarting Anki"
+                                            )
+
+            # Action buttons
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button(
+                    "Cancel",
+                    on_click=dialog.close
+                ).props("flat")
+
+                ui.button(
+                    "Export",
+                    icon="file_upload",
+                    on_click=perform_export
+                ).classes("bg-purple-500")
+
+        dialog.open()
