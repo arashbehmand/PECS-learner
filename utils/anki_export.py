@@ -7,7 +7,7 @@ Supports two export methods:
 """
 
 import json
-import random
+import hashlib
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import urllib.request
@@ -189,10 +189,36 @@ class AnkiPackageExporter:
     Exporter for creating Anki package (.apkg) files using genanki.
 
     Generates native Anki package files that can be double-clicked to import.
+    Uses consistent IDs so re-exporting the same deck merges instead of duplicating.
     """
 
+    # Fixed model ID for PECS cards - ensures Anki recognizes it as the same card type
+    PECS_MODEL_ID = 1607392319  # Fixed ID for PECS Basic Model
+
     @staticmethod
+    def _generate_deck_id(deck_name: str) -> int:
+        """
+        Generate a consistent deck ID based on deck name.
+
+        This ensures that re-exporting a deck with the same name will merge
+        into the existing deck in Anki instead of creating duplicates.
+
+        Args:
+            deck_name: Name of the deck
+
+        Returns:
+            Consistent integer ID for the deck
+        """
+        # Hash the deck name to get a consistent ID
+        hash_object = hashlib.md5(deck_name.encode('utf-8'))
+        # Convert first 8 bytes of hash to integer, then ensure it's in valid range
+        hash_int = int(hash_object.hexdigest()[:8], 16)
+        # Anki expects IDs in range 1 << 30 to 1 << 31
+        return (hash_int % (1 << 30)) + (1 << 30)
+
+    @classmethod
     def export_to_apkg(
+        cls,
         cards: List[Dict[str, str]],
         output_path: Path,
         deck_name: str,
@@ -213,11 +239,10 @@ class AnkiPackageExporter:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Create a model (card template) - using a unique ID based on deck name
-        model_id = random.randrange(1 << 30, 1 << 31)
-
+        # Create a model (card template) with fixed ID
+        # Using the same model ID ensures Anki recognizes cards from multiple exports
         pecs_model = genanki.Model(
-            model_id,
+            cls.PECS_MODEL_ID,
             'PECS Basic Model',
             fields=[
                 {'name': 'Question'},
@@ -241,8 +266,9 @@ class AnkiPackageExporter:
             """
         )
 
-        # Create deck with unique ID based on deck name hash
-        deck_id = random.randrange(1 << 30, 1 << 31)
+        # Create deck with consistent ID based on deck name
+        # Same deck name = same ID = Anki merges instead of duplicating
+        deck_id = cls._generate_deck_id(deck_name)
         deck = genanki.Deck(deck_id, deck_name)
 
         # Add cards to deck
