@@ -268,44 +268,41 @@ class ProjectViewPage:
             # Export method selection
             ui.label("Choose export method:").classes("font-semibold mb-2")
 
-            export_method = {"value": "api"}
+            # Create a single radio group with custom styling
+            with ui.column().classes("w-full mb-6"):
+                export_method_radio = ui.radio(
+                    {
+                        "api": "AnkiConnect (Direct) - Push cards directly to Anki via API",
+                        "file": "File Export - Download .txt file for manual import"
+                    },
+                    value="api"
+                ).props("dense")
 
-            with ui.row().classes("gap-4 mb-6"):
-                with ui.card().classes("flex-1 p-4 cursor-pointer"):
-                    with ui.column():
+                # Style cards for each option
+                with ui.row().classes("gap-4 mt-2"):
+                    with ui.card().classes("flex-1 p-4"):
                         with ui.row().classes("items-center gap-2 mb-2"):
-                            ui.radio(
-                                ["api"],
-                                value="api",
-                                on_change=lambda e: export_method.update({"value": "api"}),
-                            ).props("dense").classes("m-0")
                             ui.icon("cloud_upload").classes("text-blue-500 text-2xl")
-                            ui.label("AnkiConnect (Direct)").classes("font-semibold")
+                            with ui.column().classes("flex-1"):
+                                ui.label("AnkiConnect (Direct)").classes("font-semibold")
+                                ui.label(
+                                    "Push cards directly to Anki via API"
+                                ).classes("text-sm text-gray-600")
+                                ui.label(
+                                    "Requires: Anki running with AnkiConnect add-on"
+                                ).classes("text-xs text-orange-600 mt-1")
 
-                        ui.label(
-                            "Push cards directly to Anki via API"
-                        ).classes("text-sm text-gray-600")
-                        ui.label(
-                            "Requires: Anki running with AnkiConnect add-on"
-                        ).classes("text-xs text-orange-600 mt-1")
-
-                with ui.card().classes("flex-1 p-4 cursor-pointer"):
-                    with ui.column():
+                    with ui.card().classes("flex-1 p-4"):
                         with ui.row().classes("items-center gap-2 mb-2"):
-                            ui.radio(
-                                ["file"],
-                                value="file",
-                                on_change=lambda e: export_method.update({"value": "file"}),
-                            ).props("dense").classes("m-0")
                             ui.icon("download").classes("text-green-500 text-2xl")
-                            ui.label("File Export").classes("font-semibold")
-
-                        ui.label(
-                            "Download .txt file for manual import"
-                        ).classes("text-sm text-gray-600")
-                        ui.label(
-                            "No setup required - works offline"
-                        ).classes("text-xs text-green-600 mt-1")
+                            with ui.column().classes("flex-1"):
+                                ui.label("File Export").classes("font-semibold")
+                                ui.label(
+                                    "Download .txt file for manual import"
+                                ).classes("text-sm text-gray-600")
+                                ui.label(
+                                    "No setup required - works offline"
+                                ).classes("text-xs text-green-600 mt-1")
 
             # Deck name input
             deck_name_input = ui.input(
@@ -333,7 +330,7 @@ class ProjectViewPage:
 
             def _do_export(deck_name: str):
                 """Perform the actual export"""
-                method = export_method["value"]
+                method = export_method_radio.value
 
                 if method == "api":
                     result = export_flashcards_to_anki(
