@@ -4,17 +4,17 @@ PECS Learning System - NiceGUI Main Application
 Complete migration from Streamlit to NiceGUI with PWA support
 """
 
-import sys
-from pathlib import Path
-
-# Add parent directory to path so we can import from utils/
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 import json
 import logging
-from nicegui import ui, app
-from utils.database import DatabaseRepository
+import sys
+from functools import lru_cache
+from pathlib import Path
+
+from nicegui import app, ui
+
 from nicegui_app import config
+from utils.database import DatabaseRepository
+
 
 # ===== LOGGING SETUP =====
 def setup_logging():
@@ -26,44 +26,44 @@ def setup_logging():
     # Configure root logger
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
             # Console handler - shows in terminal
             logging.StreamHandler(sys.stdout),
             # File handler - saves to file
-            logging.FileHandler(logs_dir / "pecs_learning.log", mode='a')
-        ]
+            logging.FileHandler(logs_dir / "pecs_learning.log", mode="a"),
+        ],
     )
 
     # Set specific loggers to appropriate levels
-    logging.getLogger('nicegui').setLevel(logging.WARNING)  # Reduce NiceGUI noise
-    logging.getLogger('uvicorn').setLevel(logging.INFO)
-    logging.getLogger('utils').setLevel(logging.DEBUG)  # Our code - verbose
-    logging.getLogger('nicegui_app').setLevel(logging.DEBUG)  # Our code - verbose
+    logging.getLogger("nicegui").setLevel(logging.WARNING)  # Reduce NiceGUI noise
+    logging.getLogger("uvicorn").setLevel(logging.INFO)
+    logging.getLogger("utils").setLevel(logging.DEBUG)  # Our code - verbose
+    logging.getLogger("nicegui_app").setLevel(logging.DEBUG)  # Our code - verbose
 
-    logger = logging.getLogger(__name__)
-    logger.info("Logging initialized - output to console and logs/pecs_learning.log")
-    return logger
+    module_logger = logging.getLogger(__name__)
+    module_logger.info(
+        "Logging initialized - output to console and logs/pecs_learning.log"
+    )
+    return module_logger
+
 
 # Initialize logging first
 logger = setup_logging()
 
-# Initialize database (singleton pattern)
-_db_instance = None
 
+# Database accessor (cached singleton)
+@lru_cache(maxsize=1)
 def get_database() -> DatabaseRepository:
-    """Get or create database instance"""
-    global _db_instance
-    if _db_instance is None:
-        _db_instance = DatabaseRepository()
-    return _db_instance
+    """Return a singleton DatabaseRepository instance."""
+    return DatabaseRepository()
 
 
 # ===== PWA SETUP =====
 def setup_pwa():
     """Setup Progressive Web App configuration"""
 
-    PWA_MANIFEST = {
+    pwa_manifest = {
         "name": config.APP_NAME,
         "short_name": config.APP_SHORT_NAME,
         "description": config.APP_DESCRIPTION,
@@ -73,13 +73,21 @@ def setup_pwa():
         "theme_color": config.PWA_THEME_COLOR,
         "orientation": "portrait-primary",
         "icons": [
-            {"src": "/static/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png"},
-            {"src": "/static/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png"}
+            {
+                "src": "/static/icons/icon-192x192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+            },
+            {
+                "src": "/static/icons/icon-512x512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+            },
         ],
-        "categories": ["education", "productivity"]
+        "categories": ["education", "productivity"],
     }
 
-    SERVICE_WORKER_JS = """
+    service_worker_js = """
     const CACHE_NAME = 'pecs-learning-v2';
     const urlsToCache = ['/', '/static/manifest.json'];
 
@@ -102,18 +110,19 @@ def setup_pwa():
     icons_dir.mkdir(exist_ok=True)
 
     # Write manifest
-    with open(config.STATIC_DIR / "manifest.json", "w") as f:
-        json.dump(PWA_MANIFEST, f, indent=2)
+    with open(config.STATIC_DIR / "manifest.json", "w", encoding="utf-8") as f:
+        json.dump(pwa_manifest, f, indent=2)
 
     # Write service worker
-    with open(config.STATIC_DIR / "service-worker.js", "w") as f:
-        f.write(SERVICE_WORKER_JS)
+    with open(config.STATIC_DIR / "service-worker.js", "w", encoding="utf-8") as f:
+        f.write(service_worker_js)
 
     # Serve static files
-    app.add_static_files('/static', str(config.STATIC_DIR))
+    app.add_static_files("/static", str(config.STATIC_DIR))
 
     # Add PWA meta tags
-    ui.add_head_html(f'''
+    ui.add_head_html(
+        f"""
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -128,10 +137,12 @@ def setup_pwa():
                     .catch((err) => console.error('SW registration failed:', err));
             }}
         </script>
-    ''')
+    """
+    )
 
     # Mobile-optimized styles
-    ui.add_head_html('''
+    ui.add_head_html(
+        """
         <style>
             /* Mobile-friendly responsive design */
             @media (max-width: 768px) {
@@ -153,12 +164,14 @@ def setup_pwa():
                 -moz-osx-font-smoothing: grayscale;
             }
         </style>
-    ''')
+    """
+    )
 
 
 # ===== ROUTING =====
 
-@ui.page('/')
+
+@ui.page("/")
 def dashboard_page():
     """Landing page - Project dashboard"""
     from nicegui_app.pages.dashboard import DashboardPage
@@ -168,7 +181,7 @@ def dashboard_page():
     page.render()
 
 
-@ui.page('/project/{project_id}')
+@ui.page("/project/{project_id}")
 def project_view_page(project_id: int):
     """Project overview with sections"""
     from nicegui_app.pages.project_view import ProjectViewPage
@@ -178,7 +191,7 @@ def project_view_page(project_id: int):
     page.render()
 
 
-@ui.page('/project/{project_id}/upload')
+@ui.page("/project/{project_id}/upload")
 def content_upload_page(project_id: int):
     """Upload content to project"""
     from nicegui_app.pages.content_upload import ContentUploadPage
@@ -188,7 +201,7 @@ def content_upload_page(project_id: int):
     page.render()
 
 
-@ui.page('/project/{project_id}/study')
+@ui.page("/project/{project_id}/study")
 def study_mode_page(project_id: int):
     """Flashcard study mode"""
     from nicegui_app.pages.study_mode import StudyModePage
@@ -198,7 +211,7 @@ def study_mode_page(project_id: int):
     page.render()
 
 
-@ui.page('/project/{project_id}/section/{section_id}')
+@ui.page("/project/{project_id}/section/{section_id}")
 def pecs_learning_page(project_id: int, section_id: int):
     """PECS 4-phase learning interface"""
     from nicegui_app.pages.pecs_learning import PECSLearningPage
@@ -210,9 +223,9 @@ def pecs_learning_page(project_id: int, section_id: int):
 
 # ===== MAIN ENTRY POINT =====
 if __name__ in {"__main__", "__mp_main__"}:
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print(f"{config.APP_NAME} v{config.APP_VERSION}")
-    print("="*70)
+    print("=" * 70)
     print("\nFeatures:")
     print("   - Complete NiceGUI migration from Streamlit")
     print("   - Mobile-optimized responsive design")
@@ -229,7 +242,7 @@ if __name__ in {"__main__", "__mp_main__"}:
     print("   - PECS Learning (4-phase system)")
     print("   - Study Mode (spaced repetition)")
     print("   - Section Navigator")
-    print("\n" + "="*70 + "\n")
+    print("\n" + "=" * 70 + "\n")
 
     # Setup PWA on startup
     app.on_startup(setup_pwa)
@@ -238,7 +251,7 @@ if __name__ in {"__main__", "__mp_main__"}:
         port=config.PORT,
         host=config.HOST,
         title=config.APP_NAME,
-        favicon='📚',
+        favicon="📚",
         reload=config.RELOAD,
         show=False,  # Don't auto-open browser
     )

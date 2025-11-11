@@ -1,0 +1,30 @@
+[MASTER]
+ignore=venv, data, .pytest_cache, .ruff_cache, __pycache__
+
+[MESSAGES CONTROL]
+disable=
+    C0114,  ; missing-module-docstring
+    C0115,  ; missing-class-docstring
+    C0116,  ; missing-function-docstring
+    C0301,  ; line-too-long
+    R0914,  ; too many local variables
+    R0912,  ; too many branches
+    R0915,  ; too many statements
+    W1203,  ; use lazy % formatting in logging functions
+    W0707,  ; consider explicitly re-raising with "from" keyword
+    W0718,  ; catching too general exception
+    R0401,  ; cyclic import
+    R0801,  ; duplicate code/similar lines
+    C0415,  ; import outside toplevel
+    E1133,  ; non-iterable used in iterating context
+    R0903,  ; too-few-public-methods - ORM entities, Pydantic models, adapters are intentionally minimal
+    R0913,  ; too-many-arguments - data ingestion & repository methods require all domain fields
+    R0917,  ; too-many-positional-arguments - same as R0913
+    W0201,  ; attribute-defined-outside-init - async context managers must set attrs in __aenter__
+    W0621   ; redefined-outer-name - pytest fixtures commonly have same name as fixture function
+
+[FORMAT]
+max-line-length=100
+
+[TYPECHECK]
+# (No ignore-missing-imports option here)

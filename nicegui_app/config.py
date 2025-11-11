@@ -2,6 +2,7 @@
 """
 Configuration for PECS Learning System - NiceGUI App
 """
+
 import os
 from pathlib import Path
 
@@ -9,7 +10,9 @@ from pathlib import Path
 APP_NAME = "P.E.C.S. Learning System"
 APP_SHORT_NAME = "PECS Learn"
 APP_VERSION = "2.0.0"  # NiceGUI version
-APP_DESCRIPTION = "Active learning system with AI-powered feedback and spaced repetition"
+APP_DESCRIPTION = (
+    "Active learning system with AI-powered feedback and spaced repetition"
+)
 
 # Paths
 BASE_DIR = Path(__file__).parent.parent
@@ -18,14 +21,16 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 # Server configuration
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", 8080))
+PORT = int(os.getenv("PORT", "8080"))
 RELOAD = os.getenv("RELOAD", "false").lower() == "true"  # Enable for development
 
 # Database
 DATABASE_PATH = DATA_DIR / "pecs.db"
 
 # Storage
-NICEGUI_STORAGE_PATH = os.getenv("NICEGUI_STORAGE_PATH", str(DATA_DIR / "nicegui_storage"))
+NICEGUI_STORAGE_PATH = os.getenv(
+    "NICEGUI_STORAGE_PATH", str(DATA_DIR / "nicegui_storage")
+)
 
 # Future: Multi-user support
 ENABLE_AUTHENTICATION = os.getenv("ENABLE_AUTH", "false").lower() == "true"

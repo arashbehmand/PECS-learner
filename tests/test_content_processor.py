@@ -1,23 +1,23 @@
 """
 Unit tests for content processor utilities.
 """
-import pytest
-from unittest.mock import Mock
-from utils.content_processor import load_text_from_input, chunk_text_content
+
+from utils.content_processor import chunk_text_content, load_text_from_input
 
 
 class MockUploadedFile:
     """Mock Streamlit UploadedFile object."""
-    def __init__(self, content_bytes, encoding='utf-8'):
+
+    def __init__(self, content_bytes, encoding="utf-8"):
         self._content = content_bytes
         self._encoding = encoding
-    
+
     def getvalue(self):
         return self._content
-    
+
     def decode(self, encoding):
         if encoding != self._encoding:
-            raise UnicodeDecodeError('test', b'', 0, 1, 'wrong encoding')
+            raise UnicodeDecodeError("test", b"", 0, 1, "wrong encoding")
         return self._content.decode(encoding)
 
 
@@ -56,7 +56,9 @@ def test_load_text_from_none():
 def test_load_text_prefers_pasted_over_file():
     """Test that pasted text takes precedence over file."""
     uploaded_file = MockUploadedFile(b"File content")
-    result = load_text_from_input(pasted_text="Pasted content", uploaded_file=uploaded_file)
+    result = load_text_from_input(
+        pasted_text="Pasted content", uploaded_file=uploaded_file
+    )
     assert result == "Pasted content"
 
 
@@ -64,17 +66,19 @@ def test_chunk_text_content_basic():
     """Test basic text chunking."""
     text = "This is a test. " * 100  # Create text longer than default chunk size
     chunks = chunk_text_content(text, chunk_size=150, chunk_overlap=10)
-    
+
     assert len(chunks) > 0
     assert all(isinstance(chunk, str) for chunk in chunks)
     # Verify chunks don't exceed size (with some tolerance for word boundaries)
-    assert all(len(chunk) <= 150 * 1.5 for chunk in chunks)  # LangChain may overshoot slightly
+    assert all(
+        len(chunk) <= 150 * 1.5 for chunk in chunks
+    )  # LangChain may overshoot slightly
 
 
 def test_chunk_text_content_empty():
     """Test chunking empty text."""
     result = chunk_text_content("")
-    assert result == []
+    assert not result
 
 
 def test_chunk_text_content_whitespace_only():
@@ -96,7 +100,7 @@ def test_chunk_text_content_with_overlap():
     """Test chunking with overlap between chunks."""
     text = "Word1 Word2 Word3 Word4 Word5 Word6 Word7 Word8 Word9 Word10"
     chunks = chunk_text_content(text, chunk_size=20, chunk_overlap=5)
-    
+
     if len(chunks) > 1:
         # Check that chunks have some overlap (content appears in multiple chunks)
         # This is approximate since LangChain handles overlap
@@ -107,7 +111,7 @@ def test_chunk_text_content_custom_size():
     """Test chunking with custom chunk size."""
     text = "Test word. " * 50
     chunks = chunk_text_content(text, chunk_size=50, chunk_overlap=0)
-    
+
     assert len(chunks) > 0
     # With size 50 and overlap 0, should get multiple chunks
     assert len(chunks) >= 1
@@ -117,7 +121,7 @@ def test_chunk_text_content_large_text():
     """Test chunking very large text."""
     text = "Paragraph. " * 1000  # Large text
     chunks = chunk_text_content(text, chunk_size=500, chunk_overlap=50)
-    
+
     assert len(chunks) > 1
     # Verify all text is preserved (approximately)
     total_length = sum(len(chunk) for chunk in chunks)
@@ -127,9 +131,9 @@ def test_chunk_text_content_large_text():
 def test_load_text_from_file_encoding_errors():
     """Test handling of encoding errors in file."""
     # Create file with invalid UTF-8
-    invalid_utf8 = b'\xff\xfe\x00\x00'
+    invalid_utf8 = b"\xff\xfe\x00\x00"
     uploaded_file = MockUploadedFile(invalid_utf8)
-    
+
     # Should handle the error gracefully
     try:
         result = load_text_from_input(uploaded_file=uploaded_file)
@@ -138,4 +142,3 @@ def test_load_text_from_file_encoding_errors():
     except UnicodeDecodeError:
         # This is also acceptable - the error should be handled at a higher level
         pass
-

@@ -2,15 +2,11 @@
 File format converters for EPUB and PDF files.
 Performs pure data conversion using markitdown when available.
 """
-import tempfile
-import os
-from typing import Optional
 
-try:
-    from markitdown import MarkItDown
-    MARKITDOWN_AVAILABLE = True
-except ImportError:
-    MARKITDOWN_AVAILABLE = False
+import os
+import tempfile
+
+from markitdown import MarkItDown
 
 
 def convert_file_to_text(uploaded_file) -> str:
@@ -29,9 +25,6 @@ def convert_file_to_text(uploaded_file) -> str:
         ValueError: if the conversion produced no usable text.
         Exception: any error raised by the underlying conversion library is propagated.
     """
-    if not MARKITDOWN_AVAILABLE:
-        raise ImportError("markitdown library is not installed. Install with: pip install markitdown")
-
     owns_tmp = False
     tmp_path = None
 
@@ -70,7 +63,9 @@ def convert_file_to_text(uploaded_file) -> str:
             text_content = result.content
 
         if text_content is None:
-            raise ValueError("Could not extract text from file. The file format might not be supported.")
+            raise ValueError(
+                "Could not extract text from file. The file format might not be supported."
+            )
 
         # Normalize and return
         text_content = text_content.strip()
@@ -93,18 +88,17 @@ def convert_file_to_text(uploaded_file) -> str:
 def is_supported_file_type(filename: str) -> bool:
     """
     Check if file type is supported for conversion.
-    
+
     Args:
         filename: Name of the file
-        
+
     Returns:
         bool: True if file type is supported
     """
-    supported_extensions = ['.txt', '.md', '.epub', '.pdf', '.docx', '.doc']
+    supported_extensions = [".txt", ".md", ".epub", ".pdf", ".docx", ".doc"]
     return any(filename.lower().endswith(ext) for ext in supported_extensions)
 
 
 def get_file_type_description() -> str:
     """Get description of supported file types."""
     return "Supported formats: Text (.txt), Markdown (.md), EPUB (.epub), PDF (.pdf), Word (.docx, .doc)"
-

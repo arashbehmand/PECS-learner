@@ -1,24 +1,28 @@
 """
 Unit tests for migration utility.
 """
-import pytest
+
 import json
-import tempfile
 import os
+import tempfile
 from unittest.mock import patch
-from utils.migration import migrate_json_to_database
+
+import pytest
+
 from utils.database import DatabaseRepository
+from utils.migration import migrate_json_to_database
 
 
 @pytest.fixture
 def temp_db():
     """Create a temporary database for testing."""
-    fd, path = tempfile.mkstemp(suffix='.db')
+    fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     db = DatabaseRepository(db_path=path)
     yield db
     db.engine.dispose()
     import time
+
     time.sleep(0.1)
     try:
         os.unlink(path)
@@ -33,34 +37,24 @@ def create_sample_json():
         "chunks": [
             "Chunk 1 content here",
             "Chunk 2 content here",
-            "Chunk 3 content here"
+            "Chunk 3 content here",
         ],
         "chunk_data": {
             0: {
                 "prime_preview": {
                     "initial_thoughts": "Test thoughts",
-                    "prior_knowledge": "Test knowledge"
+                    "prior_knowledge": "Test knowledge",
                 }
             },
             1: {
-                "engage_explain": {
-                    "explanation": "Test explanation"
-                },
-                "completed": True
-            }
+                "engage_explain": {"explanation": "Test explanation"},
+                "completed": True,
+            },
         },
         "all_recall_prompts": [
-            {
-                "question": "Test question 1?",
-                "answer": "Test answer 1",
-                "chunk_idx": 0
-            },
-            {
-                "question": "Test question 2?",
-                "answer": "Test answer 2",
-                "chunk_idx": 1
-            }
-        ]
+            {"question": "Test question 1?", "answer": "Test answer 1", "chunk_idx": 0},
+            {"question": "Test question 2?", "answer": "Test answer 2", "chunk_idx": 1},
+        ],
     }
 
 
@@ -91,13 +85,16 @@ def test_migrate_json_to_database_success(temp_db):
     # Verify that update_section_pecs_data works (core functionality test)
     update_result = temp_db.update_section_pecs_data(
         section_0.id,
-        'prime_preview',
-        {'initial_thoughts': 'Test thoughts', 'prior_knowledge': 'Test knowledge'}
+        "prime_preview",
+        {"initial_thoughts": "Test thoughts", "prior_knowledge": "Test knowledge"},
     )
     assert update_result is True
     section_0_updated = temp_db.get_section(section_0.id)
-    assert 'prime_preview' in section_0_updated.pecs_data
-    assert section_0_updated.pecs_data['prime_preview']['initial_thoughts'] == 'Test thoughts'
+    assert "prime_preview" in section_0_updated.pecs_data
+    assert (
+        section_0_updated.pecs_data["prime_preview"]["initial_thoughts"]
+        == "Test thoughts"
+    )
 
     # For section 1, verify completed status functionality works
     section_1 = temp_db.get_section(sections[1].id)
@@ -151,11 +148,7 @@ def test_migrate_json_to_database_duplicate_project_name(temp_db):
 
 def test_migrate_json_to_database_empty_chunks(temp_db):
     """Test migration with empty chunks array."""
-    json_data = {
-        "raw_material": "Test",
-        "chunks": [],
-        "chunk_data": {}
-    }
+    json_data = {"raw_material": "Test", "chunks": [], "chunk_data": {}}
     json_str = json.dumps(json_data)
 
     success, message = migrate_json_to_database(json_str, temp_db, "Empty Project")
@@ -175,11 +168,11 @@ def test_migrate_json_to_database_without_pecs_data(temp_db):
     json_data = {
         "raw_material": "Test",
         "chunks": ["Chunk 1", "Chunk 2"],
-        "chunk_data": {}  # No PECS data
+        "chunk_data": {},  # No PECS data
     }
     json_str = json.dumps(json_data)
 
-    success, message = migrate_json_to_database(json_str, temp_db, "No PECS Project")
+    success, _message = migrate_json_to_database(json_str, temp_db, "No PECS Project")
 
     assert success is True
 
@@ -199,11 +192,13 @@ def test_migrate_json_to_database_without_flashcards(temp_db):
         "raw_material": "Test",
         "chunks": ["Chunk 1"],
         "chunk_data": {},
-        "all_recall_prompts": []  # No flashcards
+        "all_recall_prompts": [],  # No flashcards
     }
     json_str = json.dumps(json_data)
 
-    success, message = migrate_json_to_database(json_str, temp_db, "No Flashcards Project")
+    success, _message = migrate_json_to_database(
+        json_str, temp_db, "No Flashcards Project"
+    )
 
     assert success is True
 
@@ -218,14 +213,11 @@ def test_migrate_json_to_database_completed_sections(temp_db):
     json_data = {
         "raw_material": "Test",
         "chunks": ["Chunk 1", "Chunk 2"],
-        "chunk_data": {
-            0: {"completed": True},
-            1: {"completed": False}
-        }
+        "chunk_data": {0: {"completed": True}, 1: {"completed": False}},
     }
     json_str = json.dumps(json_data)
 
-    success, message = migrate_json_to_database(json_str, temp_db, "Completed Project")
+    success, _message = migrate_json_to_database(json_str, temp_db, "Completed Project")
 
     assert success is True
 
@@ -255,7 +247,9 @@ def test_migrate_json_to_database_exception_handling(temp_db):
     json_str = json.dumps(json_data)
 
     # Mock database to raise an exception
-    with patch.object(temp_db, 'create_project', side_effect=Exception("Database error")):
+    with patch.object(
+        temp_db, "create_project", side_effect=Exception("Database error")
+    ):
         success, message = migrate_json_to_database(json_str, temp_db, "Error Project")
 
         assert success is False
