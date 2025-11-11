@@ -273,7 +273,7 @@ class ProjectViewPage:
                 export_method_radio = ui.radio(
                     {
                         "api": "AnkiConnect (Direct) - Push cards directly to Anki via API",
-                        "file": "File Export - Download .txt file for manual import"
+                        "file": "File Export - Download .apkg file for manual import"
                     },
                     value="api"
                 ).props("dense")
@@ -298,7 +298,7 @@ class ProjectViewPage:
                             with ui.column().classes("flex-1"):
                                 ui.label("File Export").classes("font-semibold")
                                 ui.label(
-                                    "Download .txt file for manual import"
+                                    "Download .apkg file to double-click import"
                                 ).classes("text-sm text-gray-600")
                                 ui.label(
                                     "No setup required - works offline"
@@ -346,7 +346,7 @@ class ProjectViewPage:
                         c if c.isalnum() or c in (" ", "-", "_") else "_"
                         for c in deck_name
                     )
-                    filename = f"{safe_deck_name}_{timestamp}.txt"
+                    filename = f"{safe_deck_name}_{timestamp}.apkg"
                     output_path = Path("data") / "exports" / filename
 
                     result = export_flashcards_to_anki(
@@ -385,7 +385,7 @@ class ProjectViewPage:
                             ).classes("text-sm text-gray-600 mt-2")
                         else:
                             ui.label(
-                                "Import in Anki: File → Import → Select .txt file"
+                                "Double-click the .apkg file to import into Anki"
                             ).classes("text-sm text-gray-600 mt-2")
 
                     else:

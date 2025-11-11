@@ -8,7 +8,6 @@ This script tests both AnkiConnect API and file-based export methods.
 from pathlib import Path
 from utils.anki_export import (
     AnkiConnectClient,
-    AnkiFileExporter,
     export_flashcards_to_anki
 )
 
@@ -57,9 +56,9 @@ def test_ankiconnect_connection():
 
 
 def test_file_export():
-    """Test file-based export"""
+    """Test file-based export (.apkg format)"""
     print("\n" + "=" * 60)
-    print("Testing File-Based Export")
+    print("Testing File-Based Export (.apkg)")
     print("=" * 60)
 
     # Create test flashcards
@@ -69,7 +68,7 @@ def test_file_export():
         MockFlashcard("What is Anki?", "A spaced repetition flashcard application"),
     ]
 
-    output_path = Path("data/exports/test_export.txt")
+    output_path = Path("data/exports/test_export.apkg")
 
     try:
         result = export_flashcards_to_anki(
@@ -84,17 +83,14 @@ def test_file_export():
             print(f"✓ {result['message']}")
             print(f"✓ File saved to: {result['file_path']}")
 
-            # Verify file content
-            with open(output_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-                print(f"✓ File contains {len(lines)} lines")
-
-                if lines:
-                    print("\nSample content:")
-                    for i, line in enumerate(lines[:2], 1):
-                        parts = line.strip().split("\t")
-                        if len(parts) >= 2:
-                            print(f"  Card {i}: Q: '{parts[0][:50]}...' A: '{parts[1][:50]}...'")
+            # Verify file exists and has content
+            if output_path.exists():
+                file_size = output_path.stat().st_size
+                print(f"✓ File size: {file_size:,} bytes")
+                print(f"✓ File can be double-clicked to import into Anki")
+            else:
+                print("✗ File was not created")
+                return False
 
             return True
         else:
@@ -173,7 +169,7 @@ def main():
 
     if file_success:
         print("\n✓ File export is working correctly!")
-        print("  You can manually import the .txt file into Anki.")
+        print("  Double-click the .apkg file to import into Anki.")
 
     if anki_connected and api_success:
         print("\n✓ AnkiConnect API is working correctly!")

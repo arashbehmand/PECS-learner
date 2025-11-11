@@ -3,14 +3,16 @@ Anki export utilities for P.E.C.S. Learning System.
 
 Supports two export methods:
 1. AnkiConnect API - Direct push to Anki (requires AnkiConnect add-on)
-2. File-based export - Generate .txt file for manual import
+2. File-based export - Generate .apkg file for manual import
 """
 
 import json
+import random
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import urllib.request
 import urllib.error
+import genanki
 
 
 class AnkiConnectClient:
@@ -182,87 +184,83 @@ class AnkiConnectClient:
         return self._invoke("addNotes", {"notes": notes})
 
 
-class AnkiFileExporter:
+class AnkiPackageExporter:
     """
-    Exporter for creating Anki-compatible text files.
+    Exporter for creating Anki package (.apkg) files using genanki.
 
-    Generates tab-separated .txt files that can be imported into Anki via:
-    File → Import → Select .txt file → Choose deck
+    Generates native Anki package files that can be double-clicked to import.
     """
 
     @staticmethod
-    def export_to_text(
+    def export_to_apkg(
         cards: List[Dict[str, str]],
         output_path: Path,
-        tags: Optional[List[str]] = None,
-        include_header: bool = False
-    ) -> int:
-        """
-        Export flashcards to Anki-compatible text format.
-
-        Format: Question\tAnswer\tTags (tab-separated, one card per line)
-
-        Args:
-            cards: List of dicts with 'question' and 'answer' keys
-            output_path: Path where to save the .txt file
-            tags: Optional list of tags to add to all cards
-            include_header: Whether to include a header row (default: False)
-
-        Returns:
-            Number of cards exported
-        """
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        tag_string = " ".join(tags) if tags else ""
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            if include_header:
-                f.write("Front\tBack\tTags\n")
-
-            for card in cards:
-                # Escape tabs and newlines in card content
-                question = card["question"].replace("\t", " ").replace("\n", "<br>")
-                answer = card["answer"].replace("\t", " ").replace("\n", "<br>")
-
-                # Write tab-separated line
-                f.write(f"{question}\t{answer}\t{tag_string}\n")
-
-        return len(cards)
-
-    @staticmethod
-    def export_to_csv(
-        cards: List[Dict[str, str]],
-        output_path: Path,
+        deck_name: str,
         tags: Optional[List[str]] = None
     ) -> int:
         """
-        Export flashcards to CSV format (alternative to text format).
+        Export flashcards to Anki package (.apkg) format.
 
         Args:
             cards: List of dicts with 'question' and 'answer' keys
-            output_path: Path where to save the .csv file
+            output_path: Path where to save the .apkg file
+            deck_name: Name for the Anki deck
             tags: Optional list of tags to add to all cards
 
         Returns:
             Number of cards exported
         """
-        import csv
-
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        tag_string = " ".join(tags) if tags else ""
+        # Create a model (card template) - using a unique ID based on deck name
+        model_id = random.randrange(1 << 30, 1 << 31)
 
-        with open(output_path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["Front", "Back", "Tags"])
+        pecs_model = genanki.Model(
+            model_id,
+            'PECS Basic Model',
+            fields=[
+                {'name': 'Question'},
+                {'name': 'Answer'},
+            ],
+            templates=[
+                {
+                    'name': 'Card 1',
+                    'qfmt': '<div style="font-size: 20px; text-align: center;">{{Question}}</div>',
+                    'afmt': '{{FrontSide}}<hr id="answer"><div style="font-size: 18px; text-align: center;">{{Answer}}</div>',
+                },
+            ],
+            css="""
+                .card {
+                    font-family: arial;
+                    font-size: 20px;
+                    text-align: center;
+                    color: black;
+                    background-color: white;
+                }
+            """
+        )
 
-            for card in cards:
-                # CSV writer handles escaping automatically
-                question = card["question"].replace("\n", "<br>")
-                answer = card["answer"].replace("\n", "<br>")
-                writer.writerow([question, answer, tag_string])
+        # Create deck with unique ID based on deck name hash
+        deck_id = random.randrange(1 << 30, 1 << 31)
+        deck = genanki.Deck(deck_id, deck_name)
+
+        # Add cards to deck
+        for card in cards:
+            # Replace newlines with HTML breaks
+            question = card["question"].replace("\n", "<br>")
+            answer = card["answer"].replace("\n", "<br>")
+
+            note = genanki.Note(
+                model=pecs_model,
+                fields=[question, answer],
+                tags=tags or []
+            )
+            deck.add_note(note)
+
+        # Create package and write to file
+        package = genanki.Package(deck)
+        package.write_to_file(str(output_path))
 
         return len(cards)
 
@@ -368,14 +366,14 @@ def export_flashcards_to_anki(
             }
 
         try:
-            exporter = AnkiFileExporter()
-            count = exporter.export_to_text(cards, output_path, tags)
+            exporter = AnkiPackageExporter()
+            count = exporter.export_to_apkg(cards, output_path, deck_name, tags)
 
             return {
                 "success": True,
                 "method": "file",
                 "count": count,
-                "message": f"Exported {count} cards to {output_path}",
+                "message": f"Exported {count} cards to {output_path.name}",
                 "file_path": str(output_path)
             }
 

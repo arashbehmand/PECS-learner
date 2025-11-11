@@ -12,6 +12,9 @@ langfuse>=2.0.0
 # File conversion
 markitdown>=0.0.1a9
 
+# Anki export
+genanki>=0.13.0
+
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
