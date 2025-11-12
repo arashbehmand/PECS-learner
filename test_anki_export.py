@@ -6,14 +6,13 @@ This script tests both AnkiConnect API and file-based export methods.
 """
 
 from pathlib import Path
-from utils.anki_export import (
-    AnkiConnectClient,
-    export_flashcards_to_anki
-)
+
+from utils.anki_export import AnkiConnectClient, export_flashcards_to_anki
 
 
 class MockFlashcard:
     """Mock flashcard object for testing"""
+
     def __init__(self, question: str, answer: str):
         self.question = question
         self.answer = answer
@@ -64,7 +63,9 @@ def test_file_export():
     # Create test flashcards
     test_cards = [
         MockFlashcard("What is Python?", "A high-level programming language"),
-        MockFlashcard("What is PECS?", "Prime, Engage, Challenge, Solidify learning method"),
+        MockFlashcard(
+            "What is PECS?", "Prime, Engage, Challenge, Solidify learning method"
+        ),
         MockFlashcard("What is Anki?", "A spaced repetition flashcard application"),
     ]
 
@@ -76,7 +77,7 @@ def test_file_export():
             deck_name="PECS Test Deck",
             method="file",
             output_path=output_path,
-            tags=["test", "pecs"]
+            tags=["test", "pecs"],
         )
 
         if result["success"]:
@@ -100,6 +101,7 @@ def test_file_export():
     except Exception as e:
         print(f"✗ Error: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -121,7 +123,7 @@ def test_api_export():
             flashcards=test_cards,
             deck_name="PECS Test Deck (API)",
             method="api",
-            tags=["test", "pecs", "api"]
+            tags=["test", "pecs", "api"],
         )
 
         if result["success"]:
@@ -135,6 +137,7 @@ def test_api_export():
     except Exception as e:
         print(f"✗ Error: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return False
 

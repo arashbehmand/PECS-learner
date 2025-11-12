@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=mixed-line-endings
 """
 Project View Page - Shows project overview and section list
 """
 
-from nicegui import ui
 from pathlib import Path
 from datetime import datetime
+from nicegui import ui
 
 from utils.database import DatabaseRepository
 from utils.models import Section
@@ -116,7 +117,7 @@ class ProjectViewPage:
                     ui.button(
                         "Export to Anki",
                         icon="download",
-                        on_click=lambda: self._show_anki_export_dialog(),
+                        on_click=self._show_anki_export_dialog,
                     ).classes("bg-purple-500 flex-1 min-w-40")
 
         # Sections list
@@ -273,9 +274,9 @@ class ProjectViewPage:
                 export_method_radio = ui.radio(
                     {
                         "api": "AnkiConnect (Direct) - Push cards directly to Anki via API",
-                        "file": "File Export - Download .apkg file for manual import"
+                        "file": "File Export - Download .apkg file for manual import",
                     },
-                    value="api"
+                    value="api",
                 ).props("dense")
 
                 # Style cards for each option
@@ -284,10 +285,12 @@ class ProjectViewPage:
                         with ui.row().classes("items-center gap-2 mb-2"):
                             ui.icon("cloud_upload").classes("text-blue-500 text-2xl")
                             with ui.column().classes("flex-1"):
-                                ui.label("AnkiConnect (Direct)").classes("font-semibold")
-                                ui.label(
-                                    "Push cards directly to Anki via API"
-                                ).classes("text-sm text-gray-600")
+                                ui.label("AnkiConnect (Direct)").classes(
+                                    "font-semibold"
+                                )
+                                ui.label("Push cards directly to Anki via API").classes(
+                                    "text-sm text-gray-600"
+                                )
                                 ui.label(
                                     "Requires: Anki running with AnkiConnect add-on"
                                 ).classes("text-xs text-orange-600 mt-1")
@@ -300,15 +303,15 @@ class ProjectViewPage:
                                 ui.label(
                                     "Download .apkg file to double-click import"
                                 ).classes("text-sm text-gray-600")
-                                ui.label(
-                                    "No setup required - works offline"
-                                ).classes("text-xs text-green-600 mt-1")
+                                ui.label("No setup required - works offline").classes(
+                                    "text-xs text-green-600 mt-1"
+                                )
 
             # Deck name input
             deck_name_input = ui.input(
                 label="Anki Deck Name",
                 value=self.project.name,
-                placeholder="Enter deck name"
+                placeholder="Enter deck name",
             ).classes("w-full mb-4")
 
             # Status message area
@@ -337,7 +340,7 @@ class ProjectViewPage:
                         flashcards=flashcards,
                         deck_name=deck_name,
                         method="api",
-                        tags=["PECS", self.project.name]
+                        tags=["PECS", self.project.name],
                     )
                 else:  # file
                     # Generate filename
@@ -354,7 +357,7 @@ class ProjectViewPage:
                         deck_name=deck_name,
                         method="file",
                         output_path=output_path,
-                        tags=["PECS", self.project.name]
+                        tags=["PECS", self.project.name],
                     )
 
                 # Update status
@@ -363,7 +366,9 @@ class ProjectViewPage:
                     if result["success"]:
                         with ui.card().classes("w-full bg-green-50 p-4"):
                             with ui.row().classes("items-start gap-2"):
-                                ui.icon("check_circle").classes("text-green-500 text-2xl")
+                                ui.icon("check_circle").classes(
+                                    "text-green-500 text-2xl"
+                                )
                                 with ui.column().classes("flex-1"):
                                     ui.label("Success!").classes(
                                         "font-bold text-green-700"
@@ -376,13 +381,13 @@ class ProjectViewPage:
                                         ui.button(
                                             "Download File",
                                             icon="download",
-                                            on_click=lambda: ui.download(file_path)
+                                            on_click=lambda: ui.download(file_path),
                                         ).classes("bg-green-500 mt-2")
 
                         if method == "api":
-                            ui.label(
-                                "Open Anki to see your new cards!"
-                            ).classes("text-sm text-gray-600 mt-2")
+                            ui.label("Open Anki to see your new cards!").classes(
+                                "text-sm text-gray-600 mt-2"
+                            )
                         else:
                             ui.label(
                                 "Double-click the .apkg file to import into Anki"
@@ -409,21 +414,14 @@ class ProjectViewPage:
                                             ui.label(
                                                 "2. Is AnkiConnect installed? (Code: 2055492159)"
                                             )
-                                            ui.label(
-                                                "3. Try restarting Anki"
-                                            )
+                                            ui.label("3. Try restarting Anki")
 
             # Action buttons
             with ui.row().classes("w-full justify-end gap-2"):
-                ui.button(
-                    "Cancel",
-                    on_click=dialog.close
-                ).props("flat")
+                ui.button("Cancel", on_click=dialog.close).props("flat")
 
                 ui.button(
-                    "Export",
-                    icon="file_upload",
-                    on_click=perform_export
+                    "Export", icon="file_upload", on_click=perform_export
                 ).classes("bg-purple-500")
 
         dialog.open()

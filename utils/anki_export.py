@@ -6,13 +6,27 @@ Supports two export methods:
 2. File-based export - Generate .apkg file for manual import
 """
 
+# pylint: disable=mixed-line-endings
+
 import json
 import hashlib
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import urllib.request
 import urllib.error
-import genanki
+
+try:
+    import genanki  # type: ignore[import]
+except ImportError:  # pragma: no cover - optional dependency at runtime
+    genanki = None  # type: ignore[assignment]
+
+
+class AnkiExportError(Exception):
+    """Base error for Anki export operations."""
+
+
+class AnkiConnectError(AnkiExportError):
+    """Error related to AnkiConnect communication or responses."""
 
 
 class AnkiConnectClient:
@@ -23,7 +37,9 @@ class AnkiConnectClient:
     Install in Anki via: Tools → Add-ons → Browse & Install → Code: 2055492159
     """
 
-    def __init__(self, url: str = "http://localhost:8765", api_key: Optional[str] = None):
+    def __init__(
+        self, url: str = "http://localhost:8765", api_key: Optional[str] = None
+    ):
         """
         Initialize AnkiConnect client.
 
@@ -34,7 +50,9 @@ class AnkiConnectClient:
         self.url = url
         self.api_key = api_key
 
-    def _invoke(self, action: str, params: Optional[Dict[str, Any]] = None, version: int = 6) -> Any:
+    def _invoke(
+        self, action: str, params: Optional[Dict[str, Any]] = None, version: int = 6
+    ) -> Any:
         """
         Execute an AnkiConnect action.
 
@@ -47,13 +65,9 @@ class AnkiConnectClient:
             The result from AnkiConnect
 
         Raises:
-            Exception: If the request fails or Anki returns an error
+            AnkiConnectError: If the request fails or Anki returns an error
         """
-        request_data = {
-            "action": action,
-            "version": version,
-            "params": params or {}
-        }
+        request_data = {"action": action, "version": version, "params": params or {}}
 
         if self.api_key:
             request_data["key"] = self.api_key
@@ -64,21 +78,23 @@ class AnkiConnectClient:
             req = urllib.request.Request(
                 self.url,
                 data=request_json,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
 
             with urllib.request.urlopen(req, timeout=10) as response:
                 response_data = json.loads(response.read().decode("utf-8"))
 
                 if response_data.get("error"):
-                    raise Exception(f"AnkiConnect error: {response_data['error']}")
+                    raise AnkiConnectError(
+                        f"AnkiConnect error: {response_data['error']}"
+                    )
 
                 return response_data.get("result")
 
         except urllib.error.URLError as e:
-            raise Exception(
-                f"Failed to connect to AnkiConnect. "
-                f"Make sure Anki is running with AnkiConnect add-on installed. "
+            raise AnkiConnectError(
+                "Failed to connect to AnkiConnect. "
+                "Make sure Anki is running with AnkiConnect add-on installed. "
                 f"Error: {str(e)}"
             )
 
@@ -122,7 +138,7 @@ class AnkiConnectClient:
         front: str,
         back: str,
         tags: Optional[List[str]] = None,
-        model_name: str = "Basic"
+        model_name: str = "Basic",
     ) -> int:
         """
         Add a note (flashcard) to Anki.
@@ -140,11 +156,8 @@ class AnkiConnectClient:
         note = {
             "deckName": deck_name,
             "modelName": model_name,
-            "fields": {
-                "Front": front,
-                "Back": back
-            },
-            "tags": tags or []
+            "fields": {"Front": front, "Back": back},
+            "tags": tags or [],
         }
 
         return self._invoke("addNote", {"note": note})
@@ -154,7 +167,7 @@ class AnkiConnectClient:
         deck_name: str,
         cards: List[Dict[str, str]],
         tags: Optional[List[str]] = None,
-        model_name: str = "Basic"
+        model_name: str = "Basic",
     ) -> List[Optional[int]]:
         """
         Add multiple notes to Anki in a single request.
@@ -173,11 +186,8 @@ class AnkiConnectClient:
             note = {
                 "deckName": deck_name,
                 "modelName": model_name,
-                "fields": {
-                    "Front": card["question"],
-                    "Back": card["answer"]
-                },
-                "tags": tags or []
+                "fields": {"Front": card["question"], "Back": card["answer"]},
+                "tags": tags or [],
             }
             notes.append(note)
 
@@ -210,7 +220,7 @@ class AnkiPackageExporter:
             Consistent integer ID for the deck
         """
         # Hash the deck name to get a consistent ID
-        hash_object = hashlib.md5(deck_name.encode('utf-8'))
+        hash_object = hashlib.md5(deck_name.encode("utf-8"))
         # Convert first 8 bytes of hash to integer, then ensure it's in valid range
         hash_int = int(hash_object.hexdigest()[:8], 16)
         # Anki expects IDs in range 1 << 30 to 1 << 31
@@ -222,7 +232,7 @@ class AnkiPackageExporter:
         cards: List[Dict[str, str]],
         output_path: Path,
         deck_name: str,
-        tags: Optional[List[str]] = None
+        tags: Optional[List[str]] = None,
     ) -> int:
         """
         Export flashcards to Anki package (.apkg) format.
@@ -239,20 +249,26 @@ class AnkiPackageExporter:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Ensure genanki is available
+        if genanki is None:
+            raise AnkiExportError(
+                "'genanki' package is required for file export. Install via 'pip install genanki'."
+            )
+
         # Create a model (card template) with fixed ID
         # Using the same model ID ensures Anki recognizes cards from multiple exports
         pecs_model = genanki.Model(
             cls.PECS_MODEL_ID,
-            'PECS Basic Model',
+            "PECS Basic Model",
             fields=[
-                {'name': 'Question'},
-                {'name': 'Answer'},
+                {"name": "Question"},
+                {"name": "Answer"},
             ],
             templates=[
                 {
-                    'name': 'Card 1',
-                    'qfmt': '<div style="font-size: 20px; text-align: center;">{{Question}}</div>',
-                    'afmt': '{{FrontSide}}<hr id="answer"><div style="font-size: 18px; text-align: center;">{{Answer}}</div>',
+                    "name": "Card 1",
+                    "qfmt": '<div style="font-size: 20px; text-align: center;">{{Question}}</div>',
+                    "afmt": '{{FrontSide}}<hr id="answer"><div style="font-size: 18px; text-align: center;">{{Answer}}</div>',
                 },
             ],
             css="""
@@ -263,7 +279,7 @@ class AnkiPackageExporter:
                     color: black;
                     background-color: white;
                 }
-            """
+            """,
         )
 
         # Create deck with consistent ID based on deck name
@@ -278,9 +294,7 @@ class AnkiPackageExporter:
             answer = card["answer"].replace("\n", "<br>")
 
             note = genanki.Note(
-                model=pecs_model,
-                fields=[question, answer],
-                tags=tags or []
+                model=pecs_model, fields=[question, answer], tags=tags or []
             )
             deck.add_note(note)
 
@@ -291,13 +305,14 @@ class AnkiPackageExporter:
         return len(cards)
 
 
+# pylint: disable=too-many-return-statements
 def export_flashcards_to_anki(
     flashcards: List[Any],
     deck_name: str,
     method: str = "api",
     output_path: Optional[Path] = None,
     tags: Optional[List[str]] = None,
-    anki_url: str = "http://localhost:8765"
+    anki_url: str = "http://localhost:8765",
 ) -> Dict[str, Any]:
     """
     High-level function to export flashcards to Anki using specified method.
@@ -321,17 +336,14 @@ def export_flashcards_to_anki(
         }
     """
     # Convert ORM objects to dicts
-    cards = [
-        {"question": card.question, "answer": card.answer}
-        for card in flashcards
-    ]
+    cards = [{"question": card.question, "answer": card.answer} for card in flashcards]
 
     if not cards:
         return {
             "success": False,
             "method": method,
             "count": 0,
-            "message": "No flashcards to export"
+            "message": "No flashcards to export",
         }
 
     if method == "api":
@@ -348,7 +360,7 @@ def export_flashcards_to_anki(
                         "Cannot connect to AnkiConnect. "
                         "Make sure Anki is running with AnkiConnect add-on installed. "
                         "Install via: Tools → Add-ons → Code: 2055492159"
-                    )
+                    ),
                 }
 
             # Create deck if it doesn't exist
@@ -371,7 +383,7 @@ def export_flashcards_to_anki(
                 "success": True,
                 "method": "api",
                 "count": success_count,
-                "message": message
+                "message": message,
             }
 
         except Exception as e:
@@ -379,7 +391,7 @@ def export_flashcards_to_anki(
                 "success": False,
                 "method": "api",
                 "count": 0,
-                "message": f"Error: {str(e)}"
+                "message": f"Error: {str(e)}",
             }
 
     elif method == "file":
@@ -388,7 +400,7 @@ def export_flashcards_to_anki(
                 "success": False,
                 "method": "file",
                 "count": 0,
-                "message": "output_path is required for file export"
+                "message": "output_path is required for file export",
             }
 
         try:
@@ -400,7 +412,7 @@ def export_flashcards_to_anki(
                 "method": "file",
                 "count": count,
                 "message": f"Exported {count} cards to {output_path.name}",
-                "file_path": str(output_path)
+                "file_path": str(output_path),
             }
 
         except Exception as e:
@@ -408,7 +420,7 @@ def export_flashcards_to_anki(
                 "success": False,
                 "method": "file",
                 "count": 0,
-                "message": f"Error: {str(e)}"
+                "message": f"Error: {str(e)}",
             }
 
     else:
@@ -416,5 +428,5 @@ def export_flashcards_to_anki(
             "success": False,
             "method": method,
             "count": 0,
-            "message": f"Unknown export method: {method}. Use 'api' or 'file'"
+            "message": f"Unknown export method: {method}. Use 'api' or 'file'",
         }
