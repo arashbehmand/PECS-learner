@@ -36,6 +36,7 @@ A production-grade, PWA-enabled learning application built with NiceGUI that gui
 - **📈 Self-Grading**: "I Knew It" / "Review Again" buttons
 - **🎯 Smart Filtering**: Study due cards, all cards, or mastered cards
 - **📊 Progress Statistics**: Track reviews, ease factors, and intervals
+- **📤 Anki Export**: Direct API push via AnkiConnect or file-based export
 
 ### AI-Enhanced Features (Optional)
 - **✍️ Context-Aware Feedback**: AI feedback based on your complete learning journey
@@ -150,6 +151,27 @@ Benefits:
 - Review flashcards with self-grading
 - System schedules optimal review intervals
 
+### 5. Export to Anki
+- Click "Export to Anki" button from project view (appears when you have flashcards)
+- Choose your export method:
+  - **AnkiConnect (Direct)**: Push cards directly to Anki via API (requires setup)
+  - **File Export**: Download .apkg file to double-click import (no setup needed)
+- Enter deck name and click "Export"
+
+#### AnkiConnect Setup (for direct API export)
+1. Install AnkiConnect add-on in Anki:
+   - Open Anki → Tools → Add-ons → Browse & Install
+   - Enter code: `2055492159`
+   - Restart Anki
+2. Make sure Anki is running before exporting
+3. Cards will appear immediately in your chosen deck
+
+#### File Export (alternative method)
+1. Choose "File Export" option
+2. Download the generated .apkg file
+3. Double-click the .apkg file to automatically import into Anki
+4. All cards will be imported with their tags into the specified deck
+
 ## 🗂️ Project Structure
 
 ```
@@ -169,6 +191,7 @@ PECS-learner/
 │   ├── models.py            # ORM models
 │   ├── llm_service.py       # AI integration
 │   ├── context_builder.py   # DRY context engineering
+│   ├── anki_export.py       # Anki export (API + file)
 │   ├── hierarchical_processor.py
 │   ├── file_converters.py
 │   └── migration.py         # JSON import utility
@@ -389,7 +412,8 @@ MIT License - See LICENSE file for details
 
 ## 🔮 Roadmap
 
-- [ ] Export flashcards to Anki/Quizlet
+- [x] Export flashcards to Anki (AnkiConnect API + .apkg export)
+- [ ] Export flashcards to Quizlet
 - [ ] Advanced analytics dashboard
 - [ ] Multiple LLM provider support
 - [ ] Custom prompt template editor

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-lines
 """
 PECS Learning Page - Guided vertical learning flow
 Redesigned for natural learning progression
