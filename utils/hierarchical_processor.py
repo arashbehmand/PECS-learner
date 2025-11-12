@@ -1,12 +1,17 @@
 """
 Hierarchical content processor for large texts.
 Processes text into logical sections (chapters, user-defined sections) instead of flat chunks.
+Supports markdown-aware splitting for better context preservation.
 """
 
 import re
 from typing import List, Optional, Tuple
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter,
+    MarkdownHeaderTextSplitter,
+    MarkdownTextSplitter,
+)
 
 
 class HierarchicalContentProcessor:
@@ -27,6 +32,99 @@ class HierarchicalContentProcessor:
             # Custom markers (user-defined)
             r"^---+\s*(.+?)\s*---+$",  # --- Section Title ---
         ]
+
+        # Markdown header splitter configuration
+        self.md_headers_to_split = [
+            ("#", "h1"),
+            ("##", "h2"),
+            ("###", "h3"),
+        ]
+
+    def _is_markdown_content(self, text: str) -> bool:
+        """
+        Detect if content contains markdown headers.
+        Returns True if markdown headers are found.
+        """
+        # Check for markdown headers (# Header, ## Header, etc.)
+        md_header_pattern = r"^#{1,6}\s+.+$"
+        lines = text.split("\n")
+
+        # Consider it markdown if we find at least 2 markdown headers
+        header_count = sum(1 for line in lines if re.match(md_header_pattern, line.strip()))
+        return header_count >= 2
+
+    def _process_markdown_sections(
+        self,
+        text: str,
+        min_section_size: int = 500,
+        max_section_size: int = 5000,
+        overlap: int = 100,
+    ) -> List[Tuple[str, Optional[str]]]:
+        """
+        Process markdown content using markdown-aware splitters.
+        Respects headers, paragraphs, lists, and tables.
+
+        Args:
+            text: The markdown text to process
+            min_section_size: Minimum characters per section
+            max_section_size: Maximum characters per section
+            overlap: Character overlap between sections
+
+        Returns:
+            List of tuples: (section_content, section_title)
+        """
+        # Step 1: Split by headers to preserve document structure
+        header_splitter = MarkdownHeaderTextSplitter(
+            headers_to_split_on=self.md_headers_to_split,
+            strip_headers=False,  # Keep headers in content for context
+        )
+
+        try:
+            header_sections = header_splitter.split_text(text)
+        except Exception:
+            # If markdown splitting fails, fall back to regex-based detection
+            return self.split_into_sections(
+                text, min_section_size, max_section_size, overlap
+            )
+
+        # Step 2: Process each header section
+        sections = []
+        md_splitter = MarkdownTextSplitter(
+            chunk_size=max_section_size,
+            chunk_overlap=overlap,
+        )
+
+        for doc in header_sections:
+            content = doc.page_content
+
+            # Extract title from metadata if available
+            title = None
+            if hasattr(doc, "metadata") and doc.metadata:
+                # Combine all header levels for a hierarchical title
+                title_parts = []
+                for key in ["h1", "h2", "h3"]:
+                    if key in doc.metadata and doc.metadata[key]:
+                        title_parts.append(doc.metadata[key])
+                title = " > ".join(title_parts) if title_parts else None
+
+            # Skip very small sections (merge with previous)
+            if len(content) < min_section_size and sections:
+                prev_content, prev_title = sections[-1]
+                merged_title = prev_title or title
+                sections[-1] = (prev_content + "\n\n" + content, merged_title)
+                continue
+
+            # If section is too large, split it further using markdown-aware splitter
+            if len(content) > max_section_size:
+                chunks = md_splitter.split_text(content)
+                for i, chunk in enumerate(chunks):
+                    chunk_title = f"{title} (Part {i + 1})" if title else None
+                    sections.append((chunk, chunk_title))
+            else:
+                sections.append((content, title))
+
+        # Filter out empty sections
+        return [(content, title) for content, title in sections if content.strip()]
 
     def detect_sections(self, text: str) -> List[Tuple[int, str, Optional[str]]]:
         """
@@ -72,6 +170,7 @@ class HierarchicalContentProcessor:
     ) -> List[Tuple[str, Optional[str]]]:
         """
         Split text into logical sections with optional titles.
+        Uses markdown-aware splitting when markdown headers are detected.
 
         Args:
             text: The full text to process
@@ -82,6 +181,13 @@ class HierarchicalContentProcessor:
         Returns:
             List of tuples: (section_content, section_title)
         """
+        # Check if content is markdown and use appropriate processing
+        if self._is_markdown_content(text):
+            return self._process_markdown_sections(
+                text, min_section_size, max_section_size, overlap
+            )
+
+        # Fall back to regex-based section detection for non-markdown content
         detected_sections = self.detect_sections(text)
 
         if len(detected_sections) == 1 and detected_sections[0][1] is None:
