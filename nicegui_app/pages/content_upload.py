@@ -273,21 +273,21 @@ class ContentUploadPage:
 
         with ui.grid(columns=2).classes("w-full gap-4"):
             min_size_slider = (
-                ui.slider(min=200, max=2000, value=500, step=100)
+                ui.slider(min=500, max=5000, value=2000, step=500)
                 .classes("w-full")
                 .props("label-always")
             )
-            ui.label("Minimum Section Size (characters)").classes("text-sm")
+            ui.label("Minimum Section Size (characters, ~1-3 pages)").classes("text-sm")
 
             max_size_slider = (
-                ui.slider(min=1000, max=10000, value=5000, step=500)
+                ui.slider(min=5000, max=50000, value=20000, step=2500)
                 .classes("w-full")
                 .props("label-always")
             )
-            ui.label("Maximum Section Size (characters)").classes("text-sm")
+            ui.label("Maximum Section Size (characters, ~3-30 pages)").classes("text-sm")
 
             overlap_slider = (
-                ui.slider(min=0, max=500, value=100, step=50)
+                ui.slider(min=0, max=1000, value=200, step=100)
                 .classes("w-full")
                 .props("label-always")
             )

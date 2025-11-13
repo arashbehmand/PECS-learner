@@ -14,6 +14,45 @@ from langchain_text_splitters import (
 )
 
 
+def _clean_title(title: str) -> str:
+    """
+    Clean up a title by removing markdown/HTML artifacts and links.
+
+    Args:
+        title: Raw title string that may contain markdown/HTML
+
+    Returns:
+        Cleaned title string
+    """
+    if not title:
+        return title
+
+    # Remove markdown links: [text](url) -> text
+    title = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', title)
+
+    # Remove standalone URLs in angle brackets: <url>
+    title = re.sub(r'<https?://[^>]+>', '', title)
+
+    # Remove standalone URLs
+    title = re.sub(r'https?://\S+', '', title)
+
+    # Remove HTML tags
+    title = re.sub(r'<[^>]+>', '', title)
+
+    # Remove markdown formatting (bold, italic, etc.)
+    title = re.sub(r'[*_`]+', '', title)
+
+    # Remove multiple spaces and trim
+    title = re.sub(r'\s+', ' ', title).strip()
+
+    # If title is too long (likely not a real title), truncate or return None
+    if len(title) > 200:
+        # Take first 100 chars and add ellipsis
+        title = title[:100].rsplit(' ', 1)[0] + '...'
+
+    return title
+
+
 class HierarchicalContentProcessor:
     """Processes large texts into hierarchical sections."""
 
@@ -42,23 +81,42 @@ class HierarchicalContentProcessor:
 
     def _is_markdown_content(self, text: str) -> bool:
         """
-        Detect if content contains markdown headers.
-        Returns True if markdown headers are found.
+        Detect if content contains meaningful markdown headers (not just citations).
+        Returns True if real markdown section headers are found.
         """
         # Check for markdown headers (# Header, ## Header, etc.)
-        md_header_pattern = r"^#{1,6}\s+.+$"
+        md_header_pattern = r"^#{1,6}\s+(.+)$"
         lines = text.split("\n")
 
-        # Consider it markdown if we find at least 2 markdown headers
-        header_count = sum(1 for line in lines if re.match(md_header_pattern, line.strip()))
-        return header_count >= 2
+        # Count only headers that look like real section headers
+        real_header_count = 0
+        for line in lines:
+            match = re.match(md_header_pattern, line.strip())
+            if match:
+                header_text = match.group(1)
+                # Skip headers that are likely citations/references/URLs
+                # Real headers are typically:
+                # - Not starting with "here" (references like "here some text:")
+                # - Not mostly URLs
+                # - Not too long (> 150 chars is likely a citation)
+                # - Contains actual words, not just punctuation
+                if (
+                    not header_text.lower().startswith("here ")
+                    and "http" not in header_text.lower()
+                    and len(header_text) < 150
+                    and re.search(r'\w{3,}', header_text)  # At least one 3+ char word
+                ):
+                    real_header_count += 1
+
+        # Require at least 3 real headers to consider it structured markdown
+        return real_header_count >= 3
 
     def _process_markdown_sections(
         self,
         text: str,
-        min_section_size: int = 500,
-        max_section_size: int = 5000,
-        overlap: int = 100,
+        min_section_size: int = 2000,
+        max_section_size: int = 20000,
+        overlap: int = 200,
     ) -> List[Tuple[str, Optional[str]]]:
         """
         Process markdown content using markdown-aware splitters.
@@ -104,7 +162,9 @@ class HierarchicalContentProcessor:
                 title_parts = []
                 for key in ["h1", "h2", "h3"]:
                     if key in doc.metadata and doc.metadata[key]:
-                        title_parts.append(doc.metadata[key])
+                        cleaned = _clean_title(doc.metadata[key])
+                        if cleaned:  # Only add non-empty cleaned titles
+                            title_parts.append(cleaned)
                 title = " > ".join(title_parts) if title_parts else None
 
             # Skip very small sections (merge with previous)
@@ -164,9 +224,9 @@ class HierarchicalContentProcessor:
     def split_into_sections(
         self,
         text: str,
-        min_section_size: int = 500,
-        max_section_size: int = 5000,
-        overlap: int = 100,
+        min_section_size: int = 2000,
+        max_section_size: int = 20000,
+        overlap: int = 200,
     ) -> List[Tuple[str, Optional[str]]]:
         """
         Split text into logical sections with optional titles.
@@ -248,9 +308,9 @@ class HierarchicalContentProcessor:
         text: str,
         use_custom_markers: bool = False,
         custom_markers: Optional[List[str]] = None,
-        min_section_size: int = 500,
-        max_section_size: int = 5000,
-        overlap: int = 100,
+        min_section_size: int = 2000,
+        max_section_size: int = 20000,
+        overlap: int = 200,
     ) -> List[Tuple[str, Optional[str]]]:
         """
         Main entry point for processing text.
@@ -285,9 +345,9 @@ class HierarchicalContentProcessor:
 
 def create_sections_from_text(
     text: str,
-    min_section_size: int = 500,
-    max_section_size: int = 5000,
-    overlap: int = 100,
+    min_section_size: int = 2000,
+    max_section_size: int = 20000,
+    overlap: int = 200,
 ) -> List[Tuple[str, Optional[str]]]:
     """
     Convenience function to process text into sections.
