@@ -14,18 +14,24 @@ from langchain_text_splitters import (
 )
 
 
-def _clean_title(title: str) -> str:
+def _clean_title(title: str) -> Optional[str]:
     """
     Clean up a title by removing markdown/HTML artifacts and links.
+    Returns None if the title appears to be a citation/reference rather than a real section title.
 
     Args:
         title: Raw title string that may contain markdown/HTML
 
     Returns:
-        Cleaned title string
+        Cleaned title string, or None if this looks like a citation
     """
     if not title:
-        return title
+        return None
+
+    # Check if this looks like a citation/reference (before cleaning)
+    # Citations typically start with "here" or "see" in academic texts
+    if title.lower().strip().startswith(("here ", "see ", "cf. ", "e.g. ", "i.e. ")):
+        return None
 
     # Remove markdown links: [text](url) -> text
     title = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', title)
@@ -45,10 +51,19 @@ def _clean_title(title: str) -> str:
     # Remove multiple spaces and trim
     title = re.sub(r'\s+', ' ', title).strip()
 
-    # If title is too long (likely not a real title), truncate or return None
+    # If title is too long (likely not a real title), it's probably a citation
     if len(title) > 200:
-        # Take first 100 chars and add ellipsis
-        title = title[:100].rsplit(' ', 1)[0] + '...'
+        return None
+
+    # If title is empty after cleaning
+    if not title:
+        return None
+
+    # If title contains too many citation markers (colons, semicolons)
+    # Real chapter titles rarely have multiple colons/semicolons
+    citation_markers = title.count(':') + title.count(';')
+    if citation_markers > 2:
+        return None
 
     return title
 
@@ -152,11 +167,15 @@ class HierarchicalContentProcessor:
             chunk_overlap=overlap,
         )
 
+        # Buffer for front-matter citations before first real chapter
+        front_matter_buffer = []
+
         for doc in header_sections:
             content = doc.page_content
 
             # Extract title from metadata if available
             title = None
+            is_citation_section = False
             if hasattr(doc, "metadata") and doc.metadata:
                 # Combine all header levels for a hierarchical title
                 title_parts = []
@@ -165,7 +184,25 @@ class HierarchicalContentProcessor:
                         cleaned = _clean_title(doc.metadata[key])
                         if cleaned:  # Only add non-empty cleaned titles
                             title_parts.append(cleaned)
+                        elif doc.metadata[key]:  # Had a title but cleaning returned None (citation)
+                            is_citation_section = True
                 title = " > ".join(title_parts) if title_parts else None
+
+            # Handle citation sections (references, footnotes, etc.)
+            if is_citation_section and not title:
+                if not sections:
+                    # Front-matter citations before first real chapter - buffer them
+                    front_matter_buffer.append(content)
+                else:
+                    # Merge with previous section if it exists
+                    prev_content, prev_title = sections[-1]
+                    sections[-1] = (prev_content + "\n\n" + content, prev_title)
+                continue
+
+            # If this is the first real section, prepend buffered front-matter
+            if front_matter_buffer and not sections:
+                content = "\n\n".join(front_matter_buffer) + "\n\n" + content
+                front_matter_buffer = []
 
             # Skip very small sections (merge with previous)
             if len(content) < min_section_size and sections:
