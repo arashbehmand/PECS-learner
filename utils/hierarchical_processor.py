@@ -28,11 +28,49 @@ def _clean_title(title: str) -> Optional[str]:
     if not title:
         return None
 
-    # Check if this looks like a citation/reference (before cleaning)
-    # Citations typically start with "here" or "see" in academic texts
-    if title.lower().strip().startswith(("here ", "see ", "cf. ", "e.g. ", "i.e. ")):
+    original_title = title  # Keep for citation pattern checking
+
+    # Check if this looks like a citation/reference BEFORE cleaning
+    # Citations typically start with certain keywords
+    if title.lower().strip().startswith(("here ", "see ", "cf. ", "e.g. ", "i.e. ", "ibid")):
         return None
 
+    # Check for bibliography/citation patterns (before cleaning)
+    # Pattern 1: Author name with comma (Last, First or Author, 'Title')
+    # Pattern 2: Contains year in format (YYYY)
+    # Pattern 3: Contains publication markers
+    citation_indicators = 0
+
+    # Check for author-name pattern at start (Name, or Name., or Name,')
+    if re.match(r"^[A-Z][a-z]+,\s", title):
+        citation_indicators += 2  # Strong indicator
+
+    # Check for 4-digit years (common in citations)
+    if re.search(r'\b(19|20)\d{2}\b', title):
+        citation_indicators += 1
+
+    # Check for URLs (very strong indicator)
+    if 'http' in title.lower() or re.search(r'www\.\S+', title):
+        citation_indicators += 2
+
+    # Check for publication/journal patterns
+    if re.search(r'\b(Journal|Review|Post|Times|Magazine|Press|Publishing)\b', title, re.IGNORECASE):
+        citation_indicators += 1
+
+    # Check for volume/issue patterns like "vol." or "pp."
+    if re.search(r'\b(vol\.|pp\.|p\.|no\.|doi:)', title, re.IGNORECASE):
+        citation_indicators += 2
+
+    # Count punctuation density BEFORE cleaning (citations have many commas, colons, semicolons)
+    punct_count = title.count(',') + title.count(':') + title.count(';') + title.count('.')
+    if punct_count > 5:  # More than 5 punctuation marks is likely a citation
+        citation_indicators += 1
+
+    # If enough citation indicators, reject as citation
+    if citation_indicators >= 3:
+        return None
+
+    # Now clean the title
     # Remove markdown links: [text](url) -> text
     title = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', title)
 
@@ -59,11 +97,9 @@ def _clean_title(title: str) -> Optional[str]:
     if not title:
         return None
 
-    # If title contains too many citation markers (colons, semicolons)
-    # Real chapter titles rarely have multiple colons/semicolons
-    citation_markers = title.count(':') + title.count(';')
-    if citation_markers > 2:
-        return None
+    # Final check: if cleaned title is very short but original was long (lots of URLs removed)
+    if len(title) < 20 and len(original_title) > 100:
+        return None  # Probably was mostly URLs/formatting
 
     return title
 
