@@ -109,6 +109,9 @@ class HierarchicalContentProcessor:
 
     def __init__(self):
         self.section_patterns = [
+            # EPUB-style chapter markers (markdown links followed by content)
+            # Pattern: [Chapter Title](chXX...) followed by actual text
+            r"^\[([^\]]{10,200})\]\(ch\d+[^)]+\)\s*$",  # EPUB chapter links
             # Chapter patterns
             r"^(?:Chapter\s+\d+|CHAPTER\s+\d+|Chapter\s+[IVXLC]+)\s*[:-]?\s*(.+)$",
             r"^#+\s*(?:Chapter\s+\d+|Chapter\s+[IVXLC]+)\s*[:-]?\s*(.+)$",
@@ -263,6 +266,9 @@ class HierarchicalContentProcessor:
         """
         Detect logical sections in the text.
 
+        For EPUB-style links, filters out TOC entries by checking if the next lines
+        contain actual content vs more links.
+
         Returns:
             List of tuples: (line_number, section_title, section_start_index)
             where section_title can be None if no title is found
@@ -282,6 +288,18 @@ class HierarchicalContentProcessor:
                     title = match.group(1).strip() if match.groups() else None
                     if not title:
                         title = match.group(0).strip()
+
+                    # For EPUB-style chapter links, check if this is TOC or real content
+                    if pattern.startswith(r"^\["):  # EPUB link pattern
+                        # Check the next few lines to see if they contain real content or just more links
+                        next_lines = lines[i+1:i+10]  # Look at next 10 lines
+                        # Count links vs actual text
+                        link_count = sum(1 for l in next_lines if re.match(r'^\[.*\]\(.*\)', l.strip()))
+                        text_count = sum(1 for l in next_lines if l.strip() and not re.match(r'^\[.*\]\(.*\)', l.strip()))
+
+                        # If mostly links (TOC), skip this entry
+                        if link_count > text_count and link_count > 2:
+                            continue
 
                     # Find the actual start position in the text
                     start_pos = text.find(line)
@@ -334,6 +352,22 @@ class HierarchicalContentProcessor:
         )
 
         for i, (_line_num, title, start_pos) in enumerate(detected_sections):
+            # Clean the title - filter out citations/references
+            cleaned_title = _clean_title(title) if title else None
+
+            # If title was filtered as citation, skip or merge this section
+            if title and not cleaned_title:
+                # This was a citation section, merge with previous if exists
+                if sections:
+                    if i + 1 < len(detected_sections):
+                        end_pos = detected_sections[i + 1][2]
+                    else:
+                        end_pos = len(text)
+                    section_content = text[start_pos:end_pos].strip()
+                    prev_content, prev_title = sections[-1]
+                    sections[-1] = (prev_content + "\n\n" + section_content, prev_title)
+                continue
+
             # Determine end position
             if i + 1 < len(detected_sections):
                 end_pos = detected_sections[i + 1][2]
@@ -350,7 +384,7 @@ class HierarchicalContentProcessor:
                     prev_content, prev_title = sections[-1]
                     sections[-1] = (
                         prev_content + "\n\n" + section_content,
-                        prev_title or title,
+                        prev_title or cleaned_title,
                     )
                     continue
 
@@ -358,10 +392,10 @@ class HierarchicalContentProcessor:
             if len(section_content) > max_section_size:
                 chunks = text_splitter.split_text(section_content)
                 for j, chunk in enumerate(chunks):
-                    chunk_title = f"{title} (Part {j + 1})" if title else None
+                    chunk_title = f"{cleaned_title} (Part {j + 1})" if cleaned_title else None
                     sections.append((chunk, chunk_title))
             else:
-                sections.append((section_content, title))
+                sections.append((section_content, cleaned_title))
 
         # Filter out empty sections
         return [(content, title) for content, title in sections if content.strip()]
