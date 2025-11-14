@@ -8,17 +8,14 @@ Supports two export methods:
 
 # pylint: disable=mixed-line-endings
 
-import json
 import hashlib
-from pathlib import Path
-from typing import List, Optional, Dict, Any
-import urllib.request
+import json
 import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-try:
-    import genanki  # type: ignore[import]
-except ImportError:  # pragma: no cover - optional dependency at runtime
-    genanki = None  # type: ignore[assignment]
+import genanki
 
 
 class AnkiExportError(Exception):
@@ -248,12 +245,6 @@ class AnkiPackageExporter:
         """
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Ensure genanki is available
-        if genanki is None:
-            raise AnkiExportError(
-                "'genanki' package is required for file export. Install via 'pip install genanki'."
-            )
 
         # Create a model (card template) with fixed ID
         # Using the same model ID ensures Anki recognizes cards from multiple exports

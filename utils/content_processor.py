@@ -1,7 +1,10 @@
 import re
 from typing import List, Optional
 
-from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownTextSplitter
+from langchain_text_splitters import (
+    MarkdownTextSplitter,
+    RecursiveCharacterTextSplitter,
+)
 
 
 def load_text_from_input(pasted_text: Optional[str] = None, uploaded_file=None) -> str:
@@ -34,7 +37,7 @@ def _is_markdown_content(text: str) -> bool:
                 not header_text.lower().startswith("here ")
                 and "http" not in header_text.lower()
                 and len(header_text) < 150
-                and re.search(r'\w{3,}', header_text)
+                and re.search(r"\w{3,}", header_text)
             ):
                 real_header_count += 1
 

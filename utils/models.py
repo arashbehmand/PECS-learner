@@ -74,6 +74,16 @@ class Section(Base):
     # PECS data stored as flexible JSON
     pecs_data = Column(JSON, default={})
 
+    # Rolling context: summary of previous sections in material sequence
+    # This is about the natural flow of the material, not user progress
+    rolling_summary = Column(
+        Text, nullable=True
+    )  # Concise summary of sections 0 to (order_index - 1)
+
+    # Study notes: diagram-style notes with connections, definitions, key concepts
+    # Generated with context from rolling_summary
+    study_notes = Column(Text, nullable=True)  # Markdown format study notes
+
     # Completion tracking
     is_completed = Column(Boolean, default=False)
     completed_at = Column(DateTime, nullable=True)

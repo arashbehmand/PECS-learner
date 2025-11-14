@@ -128,6 +128,9 @@ class PECSLearningPage:
             # Render completion report if it exists (persistent, not dialog)
             self._render_completion_report()
 
+            # Render study notes if they exist
+            self._render_study_notes()
+
     def _render_completion_report(self):
         """Render the completion report card (persistent, not a dialog)"""
         pecs_data = self.section.pecs_data or {}
@@ -1251,3 +1254,145 @@ Be analytical and honest. Don't be overly enthusiastic or artificially encouragi
                 position="top",
             )
             ui.navigate.reload()
+
+    def _render_study_notes(self):
+        """Render study notes card if they exist"""
+        if not self.section.study_notes:
+            return  # Don't show anything if no study notes exist
+
+        # Show study notes card
+        with ui.card().classes(
+            "w-full p-6 bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-500"
+        ):
+            with ui.row().classes("w-full items-center gap-2 mb-4"):
+                ui.icon("auto_awesome", size="md").classes("text-indigo-600")
+                ui.label("Study Notes").classes("text-2xl font-bold flex-1")
+                ui.label("AI-Generated").classes("text-sm text-gray-600")
+
+            with ui.column().classes("gap-2 mb-4"):
+                ui.label(
+                    "Comprehensive study notes with key concepts, connections, and definitions"
+                ).classes("text-sm text-gray-700")
+
+            with ui.expansion(
+                "View study notes (Feynman method)", icon="school"
+            ).classes("w-full"):
+                with ui.scroll_area().classes("w-full max-h-96"):
+                    ui.markdown(self.section.study_notes).classes(
+                        "text-sm prose max-w-none"
+                    )
+
+                # Regenerate button
+                ui.button(
+                    "Regenerate Notes",
+                    icon="refresh",
+                    on_click=self._regenerate_study_notes,
+                ).classes("bg-indigo-500 mt-4")
+
+            # Show rolling context info if available
+            if self.section.rolling_summary:
+                with ui.expansion(
+                    "View previous sections context", icon="summarize"
+                ).classes("w-full mt-2"):
+                    with ui.scroll_area().classes("w-full max-h-64"):
+                        ui.markdown(self.section.rolling_summary).classes(
+                            "text-sm text-gray-700"
+                        )
+
+    def _regenerate_study_notes(self):
+        """Regenerate study notes for the current section"""
+        from utils.rolling_context_service import RollingContextService
+
+        llm_service = self.llm_service
+
+        if not llm_service.is_available():
+            ui.notify("AI service unavailable", color="negative", position="top")
+            return
+
+        async def start_regeneration():
+            """Start the regeneration process with async support"""
+
+            with ui.dialog() as dialog, ui.card().classes("w-full max-w-lg"):
+                ui.label("Regenerate Study Notes").classes("text-xl font-bold mb-4")
+
+                progress_container = ui.column().classes("w-full mb-4")
+                status_label = ui.label("").classes("text-gray-700")
+
+                with progress_container:
+                    with ui.row().classes("items-center gap-2"):
+                        ui.spinner(size="md")
+                        status_label.text = "Starting..."
+
+                # Shared state
+                state = {
+                    "phase": "starting",
+                    "done": False,
+                    "error": None,
+                    "success": False,
+                }
+
+                def run_regeneration():
+                    """Run regeneration in background thread"""
+                    try:
+                        rolling_service = RollingContextService(llm_service, self.db)
+
+                        # First ensure rolling context exists
+                        if not self.section.rolling_summary:
+                            state["phase"] = "context"
+                            rolling_service.generate_rolling_summary(self.section_id)
+
+                        # Generate study notes
+                        state["phase"] = "notes"
+                        notes = rolling_service.generate_study_notes(
+                            self.section_id, force_regenerate=True
+                        )
+
+                        if notes:
+                            state["success"] = True
+                        else:
+                            state["error"] = "Failed to generate study notes"
+
+                        state["done"] = True
+
+                    except Exception as e:
+                        state["error"] = str(e)
+                        state["done"] = True
+
+                # Start in background
+                asyncio.create_task(asyncio.to_thread(run_regeneration))
+
+                # Poll for updates
+                def update_ui():
+                    """Update UI based on state"""
+                    if not state["done"]:
+                        # Update status message
+                        if state["phase"] == "context":
+                            status_label.text = "Generating rolling context..."
+                        elif state["phase"] == "notes":
+                            status_label.text = "Generating study notes..."
+                        return True  # Keep polling
+
+                    # Done - show result
+                    if state["success"]:
+                        dialog.close()
+                        ui.notify(
+                            "Study notes regenerated!", color="positive", position="top"
+                        )
+                        ui.navigate.reload()
+                    else:
+                        progress_container.clear()
+                        with progress_container:
+                            with ui.card().classes("bg-red-50 p-4"):
+                                ui.label(state["error"] or "Unknown error").classes(
+                                    "text-red-700"
+                                )
+
+                    return False  # Stop polling
+
+                # Poll every 100ms
+                ui.timer(0.1, update_ui)
+
+            dialog.open()
+
+        # Start the regeneration
+        start_regeneration()

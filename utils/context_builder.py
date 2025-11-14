@@ -4,10 +4,13 @@ Context Engineering Utilities for AI Features
 This module provides DRY (Don't Repeat Yourself) utilities for building
 comprehensive learning context from section state. Used across all AI features
 to ensure consistent, high-quality context.
+
+Includes support for rolling context - cumulative summaries of previous sections
+based on material sequence (not user progress).
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +20,7 @@ def build_learning_context(
     pecs_data: Dict[str, Any],
     flashcards: List[Dict[str, str]] = None,
     include_conversations: bool = False,
+    rolling_summary: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Build comprehensive learning context from section state.
@@ -29,6 +33,7 @@ def build_learning_context(
         pecs_data: Section's PECS data (phases, conversations, completion)
         flashcards: List of committed DB flashcards (NOT ephemeral suggestions)
         include_conversations: Whether to include conversation history
+        rolling_summary: Optional summary of previous sections (rolling context)
 
     Returns:
         Dictionary with comprehensive learning context
@@ -40,6 +45,7 @@ def build_learning_context(
         "critical_thinking": None,  # Challenge phase
         "conversations": {},
         "flashcards": flashcards or [],
+        "rolling_summary": rolling_summary,  # Context from previous sections
     }
 
     # Extract Prime phase data
@@ -212,5 +218,42 @@ def format_context_for_completion(context: Dict[str, Any]) -> str:
             parts.append(f"{i}. Q: {card['question']}")
             parts.append(f"   A: {card['answer']}")
         parts.append("")
+
+    return "\n".join(parts)
+
+
+def format_context_with_rolling_summary(context: Dict[str, Any]) -> str:
+    """
+    Format learning context for PECS AI feedback, including rolling summary.
+
+    This version includes the rolling context from previous sections to give AI
+    better understanding of the material's narrative flow.
+
+    Args:
+        context: Dictionary from build_learning_context(rolling_summary=...)
+
+    Returns:
+        Formatted string ready for LLM prompt
+    """
+    parts = []
+
+    # Rolling summary from previous sections (if available)
+    if context.get("rolling_summary"):
+        parts.append("=" * 60)
+        parts.append("PREVIOUS SECTIONS SUMMARY (Rolling Context)")
+        parts.append("=" * 60)
+        parts.append(context["rolling_summary"])
+        parts.append("")
+        parts.append("⬇️  The current section builds upon this foundation")
+        parts.append("")
+
+    # Current section content
+    parts.append("=" * 60)
+    parts.append("CURRENT SECTION")
+    parts.append("=" * 60)
+    parts.append(
+        context["content"][:2000] + ("..." if len(context["content"]) > 2000 else "")
+    )
+    parts.append("")
 
     return "\n".join(parts)

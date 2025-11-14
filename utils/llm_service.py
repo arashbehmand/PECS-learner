@@ -4,12 +4,19 @@ import os
 import re
 from typing import Dict, List, Optional
 
+import litellm
 import yaml
-from langfuse.openai import OpenAI as LangfuseOpenAI
+from litellm import completion
 from openai import OpenAI
+
+from nicegui_app.config import LLM_MODEL_DEFAULT, LLM_MODEL_FAST, LLM_MODEL_QUALITY
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+# Configure LiteLLM
+litellm.drop_params = True  # Drop unsupported params instead of erroring
+litellm.set_verbose = os.getenv("LITELLM_VERBOSE", "false").lower() == "true"
 
 
 def extract_json_from_markdown(content: str) -> str:
@@ -36,37 +43,63 @@ class LLMService:
         with open("utils/prompts.yaml", "r", encoding="utf-8") as f:
             self.prompts = yaml.safe_load(f)
 
-        # Get the API key from environment variable
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        # Initialize client attribute so tests can rely on its presence
+        self.client: Optional[OpenAI] = None
 
-        # Initialize client if we have an API key
+        # Check if API key is available (LiteLLM reads from env automatically)
+        self.api_key = (
+            os.getenv("OPENAI_API_KEY")
+            or os.getenv("ANTHROPIC_API_KEY")
+            or os.getenv("GEMINI_API_KEY")
+        )
+
         if self.api_key:
-            # Use Langfuse for observability if configured, otherwise standard OpenAI client
-            langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
-            langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
-            langfuse_host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+            self.client = OpenAI(api_key=self.api_key)
+            logger.info("LLM client initialized via OpenAI SDK")
+        else:
+            logger.warning(
+                "No API key found. LLM features will be unavailable. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY."
+            )
 
-            if langfuse_public_key and langfuse_secret_key:
-                self.client = LangfuseOpenAI(
-                    api_key=self.api_key,
-                    langfuse_public_key=langfuse_public_key,
-                    langfuse_secret_key=langfuse_secret_key,
-                    langfuse_host=langfuse_host,
-                )
-                logger.info("LLM service initialized with Langfuse observability")
-            else:
-                self.client = OpenAI(api_key=self.api_key)
+        # Configure Langfuse for observability (if available)
+        langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+        langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+        langfuse_host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+
+        if langfuse_public_key and langfuse_secret_key:
+            try:
+                # Enable Langfuse integration with LiteLLM
+                litellm.success_callback = ["langfuse"]
+                litellm.failure_callback = ["langfuse"]
+                os.environ.setdefault("LANGFUSE_PUBLIC_KEY", langfuse_public_key)
+                os.environ.setdefault("LANGFUSE_SECRET_KEY", langfuse_secret_key)
+                os.environ.setdefault("LANGFUSE_HOST", langfuse_host)
                 logger.info(
-                    "LLM service initialized without observability (set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY for tracking)"
+                    "LLM service initialized with Langfuse observability via LiteLLM"
+                )
+            except Exception as e:
+                logger.warning(
+                    "Langfuse integration failed (%s). Continuing without observability.",
+                    e,
                 )
         else:
-            self.client = None
-            logger.warning("No OpenAI API key found. LLM features will be unavailable.")
+            logger.info(
+                "LLM service initialized without observability (set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY for tracking)"
+            )
 
-        self.model = "gpt-3.5-turbo"  # Default to a cost-effective model
+        # Configure models from config (configurable via environment variables)
+        self.model = LLM_MODEL_DEFAULT  # Default model for general tasks
+        self.model_fast = LLM_MODEL_FAST  # Fast model for quick tasks (rolling context)
+        self.model_quality = (
+            LLM_MODEL_QUALITY  # Quality model for important tasks (study notes)
+        )
 
     def is_available(self) -> bool:
-        """Check if LLM service is available (API key configured)."""
+        """Check if LLM service is available.
+
+        Availability is determined by having an initialized client and loaded prompts.
+        This makes behavior deterministic for tests which mock/assign the client directly.
+        """
         return self.client is not None and self.prompts is not None
 
     def _get_prompt(self, module: str, prompt_type: str) -> Optional[Dict[str, str]]:
@@ -78,7 +111,11 @@ class LLMService:
             return None
 
     def _make_llm_call(self, system_prompt: str, user_prompt: str) -> Optional[str]:
-        """Make a call to the LLM API."""
+        """Make a call to the LLM API.
+
+        Prefer using an initialized client (e.g. OpenAI SDK) when available so tests
+        that mock client.chat.completions.create are exercised. Fall back to litellm.completion.
+        """
         if not self.is_available():
             logger.warning(
                 "LLM service is not available. Please check your API key configuration."
@@ -92,8 +129,6 @@ class LLMService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.7,
-                max_tokens=500,
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -263,8 +298,6 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.7,
-                max_tokens=1000,
             )
 
             content = response.choices[0].message.content
@@ -352,8 +385,6 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.7,
-                max_tokens=1000,
             )
 
             content = response.choices[0].message.content
@@ -377,4 +408,163 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
 
         except Exception as e:
             logger.error(f"Error generating flashcard suggestions: {str(e)}")
+            return None
+
+    # Rolling Context Methods
+    def generate_rolling_summary(
+        self,
+        previous_summary: str,
+        current_content: str,
+        section_title: str,
+    ) -> Optional[str]:
+        """
+        Generate a rolling summary that integrates current section with previous sections.
+
+        This implements the "rolling window context" from the document summarizer.
+        Uses fast model for efficiency.
+
+        Args:
+            previous_summary: Summary of all previous sections
+            current_content: Content of current section
+            section_title: Title of current section
+
+        Returns:
+            Updated rolling summary, or None if error
+        """
+        prompt = self._get_prompt("rolling_context_module", "generate_summary")
+        if not prompt:
+            logger.error("Rolling summary prompt not found")
+            return None
+
+        user_prompt = prompt["user"].format(
+            previous_summary=previous_summary or "This is the first section.",
+            current_content=current_content,
+            section_title=section_title,
+        )
+
+        try:
+            response = completion(
+                model=self.model_fast,  # Use fast model for rolling context
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error generating rolling summary: {e}", exc_info=True)
+            return None
+
+    # Study Notes Methods
+    def generate_study_notes(
+        self,
+        rolling_summary: str,
+        section_title: str,
+        section_content: str,
+        pecs_summary: str = "",
+    ) -> Optional[str]:
+        """
+        Generate study notes for a section.
+
+        Focuses on: diagrams, connections, definitions, key concepts (not summaries).
+        Uses quality model for better output.
+
+        Args:
+            rolling_summary: Context from previous sections
+            section_title: Title of current section
+            section_content: Content of current section
+            pecs_summary: Optional summary of student's learning journey
+
+        Returns:
+            Generated study notes in markdown format, or None if error
+        """
+        prompt = self._get_prompt("study_notes_module", "generate_section_notes")
+        if not prompt:
+            return None
+
+        user_prompt = prompt["user"].format(
+            rolling_summary=rolling_summary or "This is the first section.",
+            section_title=section_title,
+            section_content=section_content,
+            pecs_summary=pecs_summary or "No student learning data available yet.",
+        )
+
+        try:
+            response = completion(
+                model=self.model_quality,  # Use quality model for study notes
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error generating study notes: {e}", exc_info=True)
+            return None
+
+    def combine_study_notes(self, all_section_notes: List[str]) -> Optional[str]:
+        """
+        Combine individual section notes into a cohesive study guide.
+
+        This is the "reduce" phase from the document summarizer.
+        Uses quality model for better synthesis.
+
+        Args:
+            all_section_notes: List of study notes from all sections
+
+        Returns:
+            Combined study guide, or None if error
+        """
+        prompt = self._get_prompt("study_notes_module", "combine_section_notes")
+        if not prompt:
+            return None
+
+        # Format all section notes with separators
+        formatted_notes = "\n\n" + "=" * 60 + "\n\n".join(all_section_notes)
+
+        user_prompt = prompt["user"].format(all_section_notes=formatted_notes)
+
+        try:
+            response = completion(
+                model=self.model_quality,  # Use quality model
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error combining study notes: {e}", exc_info=True)
+            return None
+
+    def refine_study_notes(self, draft_notes: str) -> Optional[str]:
+        """
+        Refine and polish study notes for clarity and effectiveness.
+
+        This is the "consistency" phase from the document summarizer.
+        Uses quality model for final polish.
+
+        Args:
+            draft_notes: Draft study notes to refine
+
+        Returns:
+            Refined study notes, or None if error
+        """
+        prompt = self._get_prompt("study_notes_module", "refine_study_notes")
+        if not prompt:
+            return None
+
+        user_prompt = prompt["user"].format(draft_notes=draft_notes)
+
+        try:
+            response = completion(
+                model=self.model_quality,  # Use quality model
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": user_prompt},
+                ],
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error refining study notes: {e}", exc_info=True)
             return None

@@ -52,7 +52,9 @@ def test_epub_basic_processing():
                 assert (
                     "http" not in title
                 ), f"Title should not contain URLs: {title[:100]}"
-                assert len(title) < 200, f"Title should be reasonable length: {title[:100]}"
+                assert (
+                    len(title) < 200
+                ), f"Title should be reasonable length: {title[:100]}"
 
     finally:
         # Cleanup
@@ -83,9 +85,7 @@ def test_epub_with_local_file():
 
     # Check no citation titles
     citation_count = sum(
-        1
-        for _, title in sections
-        if title and ("http" in title or len(title) > 150)
+        1 for _, title in sections if title and ("http" in title or len(title) > 150)
     )
     assert (
         citation_count == 0
@@ -144,7 +144,7 @@ More content here.
 Another chapter.
 """
 
-    assert processor._is_markdown_content(md_text) is True
+    assert processor.is_markdown_content(md_text) is True
 
     # EPUB-link style content (no markdown headers)
     epub_text = """
@@ -157,11 +157,15 @@ This is EPUB chapter one.
 Another chapter.
 """
 
-    assert processor._is_markdown_content(epub_text) is False
+    assert processor.is_markdown_content(epub_text) is False
 
     # Both should be processable
-    md_sections = processor.split_into_sections(md_text, min_section_size=10, max_section_size=500)
-    epub_sections = processor.split_into_sections(epub_text, min_section_size=10, max_section_size=500)
+    md_sections = processor.split_into_sections(
+        md_text, min_section_size=10, max_section_size=500
+    )
+    epub_sections = processor.split_into_sections(
+        epub_text, min_section_size=10, max_section_size=500
+    )
 
     assert len(md_sections) > 0
     assert len(epub_sections) > 0
