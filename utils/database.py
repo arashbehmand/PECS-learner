@@ -238,6 +238,32 @@ class DatabaseRepository:
         finally:
             session.close()
 
+    def delete_section(self, section_id: int) -> bool:
+        """
+        Delete a section and all associated flashcards.
+
+        Args:
+            section_id: ID of section to delete
+
+        Returns:
+            True if deletion successful, False if section not found
+        """
+        session = self.get_session()
+        try:
+            section = session.query(Section).filter(Section.id == section_id).first()
+            if not section:
+                return False
+
+            # Delete section (cascades to flashcards automatically)
+            session.delete(section)
+            session.commit()
+            return True
+        except SQLAlchemyError as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
     # Flashcard operations
     def create_flashcard(
         self,

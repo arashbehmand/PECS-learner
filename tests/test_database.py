@@ -155,3 +155,64 @@ def test_update_flashcard_review(temp_db):
     updated = temp_db.get_flashcard(flashcard.id)
     assert updated.review_count == 2
     assert updated.interval_days == 1  # Reset
+
+
+def test_delete_section(temp_db):
+    """Test deleting a section."""
+    project = temp_db.create_project("Test Project")
+    section1 = temp_db.create_section(project.id, "Section 1 content", "Section 1", 0)
+    section2 = temp_db.create_section(project.id, "Section 2 content", "Section 2", 1)
+
+    # Delete section 1
+    result = temp_db.delete_section(section1.id)
+    assert result is True
+
+    # Verify section 1 is deleted
+    deleted_section = temp_db.get_section(section1.id)
+    assert deleted_section is None
+
+    # Verify section 2 still exists
+    remaining_section = temp_db.get_section(section2.id)
+    assert remaining_section is not None
+    assert remaining_section.title == "Section 2"
+
+    # Test deleting non-existent section
+    result = temp_db.delete_section(999)
+    assert result is False
+
+
+def test_delete_section_cascades_flashcards(temp_db):
+    """Test that deleting a section also deletes associated flashcards."""
+    project = temp_db.create_project("Test Project")
+    section = temp_db.create_section(project.id, "Test content", "Section 1", 0)
+
+    # Create flashcards for this section
+    flashcard1 = temp_db.create_flashcard(
+        project.id, "Question 1?", "Answer 1", section_id=section.id
+    )
+    flashcard2 = temp_db.create_flashcard(
+        project.id, "Question 2?", "Answer 2", section_id=section.id
+    )
+    # Create a flashcard for the project but not this section
+    flashcard3 = temp_db.create_flashcard(project.id, "Question 3?", "Answer 3")
+
+    # Verify flashcards exist
+    section_flashcards = temp_db.get_flashcards_by_project(
+        project.id, section_id=section.id
+    )
+    assert len(section_flashcards) == 2
+
+    # Delete the section
+    result = temp_db.delete_section(section.id)
+    assert result is True
+
+    # Verify section flashcards are deleted
+    deleted_flashcard1 = temp_db.get_flashcard(flashcard1.id)
+    deleted_flashcard2 = temp_db.get_flashcard(flashcard2.id)
+    assert deleted_flashcard1 is None
+    assert deleted_flashcard2 is None
+
+    # Verify project-level flashcard still exists
+    remaining_flashcard = temp_db.get_flashcard(flashcard3.id)
+    assert remaining_flashcard is not None
+    assert remaining_flashcard.question == "Question 3?"

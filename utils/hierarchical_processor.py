@@ -1,12 +1,107 @@
 """
 Hierarchical content processor for large texts.
 Processes text into logical sections (chapters, user-defined sections) instead of flat chunks.
+Supports markdown-aware splitting for better context preservation.
 """
 
 import re
 from typing import List, Optional, Tuple
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter,
+    MarkdownHeaderTextSplitter,
+    MarkdownTextSplitter,
+)
+
+
+def _clean_title(title: str) -> Optional[str]:
+    """
+    Clean up a title by removing markdown/HTML artifacts and links.
+    Returns None if the title appears to be a citation/reference rather than a real section title.
+
+    Args:
+        title: Raw title string that may contain markdown/HTML
+
+    Returns:
+        Cleaned title string, or None if this looks like a citation
+    """
+    if not title:
+        return None
+
+    original_title = title  # Keep for citation pattern checking
+
+    # Check if this looks like a citation/reference BEFORE cleaning
+    # Citations typically start with certain keywords
+    if title.lower().strip().startswith(("here ", "see ", "cf. ", "e.g. ", "i.e. ", "ibid")):
+        return None
+
+    # Check for bibliography/citation patterns (before cleaning)
+    # Pattern 1: Author name with comma (Last, First or Author, 'Title')
+    # Pattern 2: Contains year in format (YYYY)
+    # Pattern 3: Contains publication markers
+    citation_indicators = 0
+
+    # Check for author-name pattern at start (Name, or Name., or Name,')
+    if re.match(r"^[A-Z][a-z]+,\s", title):
+        citation_indicators += 2  # Strong indicator
+
+    # Check for 4-digit years (common in citations)
+    if re.search(r'\b(19|20)\d{2}\b', title):
+        citation_indicators += 1
+
+    # Check for URLs (very strong indicator)
+    if 'http' in title.lower() or re.search(r'www\.\S+', title):
+        citation_indicators += 2
+
+    # Check for publication/journal patterns
+    if re.search(r'\b(Journal|Review|Post|Times|Magazine|Press|Publishing)\b', title, re.IGNORECASE):
+        citation_indicators += 1
+
+    # Check for volume/issue patterns like "vol." or "pp."
+    if re.search(r'\b(vol\.|pp\.|p\.|no\.|doi:)', title, re.IGNORECASE):
+        citation_indicators += 2
+
+    # Count punctuation density BEFORE cleaning (citations have many commas, colons, semicolons)
+    punct_count = title.count(',') + title.count(':') + title.count(';') + title.count('.')
+    if punct_count > 5:  # More than 5 punctuation marks is likely a citation
+        citation_indicators += 1
+
+    # If enough citation indicators, reject as citation
+    if citation_indicators >= 3:
+        return None
+
+    # Now clean the title
+    # Remove markdown links: [text](url) -> text
+    title = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', title)
+
+    # Remove standalone URLs in angle brackets: <url>
+    title = re.sub(r'<https?://[^>]+>', '', title)
+
+    # Remove standalone URLs
+    title = re.sub(r'https?://\S+', '', title)
+
+    # Remove HTML tags
+    title = re.sub(r'<[^>]+>', '', title)
+
+    # Remove markdown formatting (bold, italic, etc.)
+    title = re.sub(r'[*_`]+', '', title)
+
+    # Remove multiple spaces and trim
+    title = re.sub(r'\s+', ' ', title).strip()
+
+    # If title is too long (likely not a real title), it's probably a citation
+    if len(title) > 200:
+        return None
+
+    # If title is empty after cleaning
+    if not title:
+        return None
+
+    # Final check: if cleaned title is very short but original was long (lots of URLs removed)
+    if len(title) < 20 and len(original_title) > 100:
+        return None  # Probably was mostly URLs/formatting
+
+    return title
 
 
 class HierarchicalContentProcessor:
@@ -14,6 +109,9 @@ class HierarchicalContentProcessor:
 
     def __init__(self):
         self.section_patterns = [
+            # EPUB-style chapter markers (markdown links followed by content)
+            # Pattern: [Chapter Title](chXX...) followed by actual text
+            r"^\[([^\]]{10,200})\]\(ch\d+[^)]+\)\s*$",  # EPUB chapter links
             # Chapter patterns
             r"^(?:Chapter\s+\d+|CHAPTER\s+\d+|Chapter\s+[IVXLC]+)\s*[:-]?\s*(.+)$",
             r"^#+\s*(?:Chapter\s+\d+|Chapter\s+[IVXLC]+)\s*[:-]?\s*(.+)$",
@@ -28,9 +126,148 @@ class HierarchicalContentProcessor:
             r"^---+\s*(.+?)\s*---+$",  # --- Section Title ---
         ]
 
+        # Markdown header splitter configuration
+        self.md_headers_to_split = [
+            ("#", "h1"),
+            ("##", "h2"),
+            ("###", "h3"),
+        ]
+
+    def _is_markdown_content(self, text: str) -> bool:
+        """
+        Detect if content contains meaningful markdown headers (not just citations).
+        Returns True if real markdown section headers are found.
+        """
+        # Check for markdown headers (# Header, ## Header, etc.)
+        md_header_pattern = r"^#{1,6}\s+(.+)$"
+        lines = text.split("\n")
+
+        # Count only headers that look like real section headers
+        real_header_count = 0
+        for line in lines:
+            match = re.match(md_header_pattern, line.strip())
+            if match:
+                header_text = match.group(1)
+                # Skip headers that are likely citations/references/URLs
+                # Real headers are typically:
+                # - Not starting with "here" (references like "here some text:")
+                # - Not mostly URLs
+                # - Not too long (> 150 chars is likely a citation)
+                # - Contains actual words, not just punctuation
+                if (
+                    not header_text.lower().startswith("here ")
+                    and "http" not in header_text.lower()
+                    and len(header_text) < 150
+                    and re.search(r'\w{3,}', header_text)  # At least one 3+ char word
+                ):
+                    real_header_count += 1
+
+        # Require at least 3 real headers to consider it structured markdown
+        return real_header_count >= 3
+
+    def _process_markdown_sections(
+        self,
+        text: str,
+        min_section_size: int = 2000,
+        max_section_size: int = 20000,
+        overlap: int = 200,
+    ) -> List[Tuple[str, Optional[str]]]:
+        """
+        Process markdown content using markdown-aware splitters.
+        Respects headers, paragraphs, lists, and tables.
+
+        Args:
+            text: The markdown text to process
+            min_section_size: Minimum characters per section
+            max_section_size: Maximum characters per section
+            overlap: Character overlap between sections
+
+        Returns:
+            List of tuples: (section_content, section_title)
+        """
+        # Step 1: Split by headers to preserve document structure
+        header_splitter = MarkdownHeaderTextSplitter(
+            headers_to_split_on=self.md_headers_to_split,
+            strip_headers=False,  # Keep headers in content for context
+        )
+
+        try:
+            header_sections = header_splitter.split_text(text)
+        except Exception:
+            # If markdown splitting fails, fall back to regex-based detection
+            return self.split_into_sections(
+                text, min_section_size, max_section_size, overlap
+            )
+
+        # Step 2: Process each header section
+        sections = []
+        md_splitter = MarkdownTextSplitter(
+            chunk_size=max_section_size,
+            chunk_overlap=overlap,
+        )
+
+        # Buffer for front-matter citations before first real chapter
+        front_matter_buffer = []
+
+        for doc in header_sections:
+            content = doc.page_content
+
+            # Extract title from metadata if available
+            title = None
+            is_citation_section = False
+            if hasattr(doc, "metadata") and doc.metadata:
+                # Combine all header levels for a hierarchical title
+                title_parts = []
+                for key in ["h1", "h2", "h3"]:
+                    if key in doc.metadata and doc.metadata[key]:
+                        cleaned = _clean_title(doc.metadata[key])
+                        if cleaned:  # Only add non-empty cleaned titles
+                            title_parts.append(cleaned)
+                        elif doc.metadata[key]:  # Had a title but cleaning returned None (citation)
+                            is_citation_section = True
+                title = " > ".join(title_parts) if title_parts else None
+
+            # Handle citation sections (references, footnotes, etc.)
+            if is_citation_section and not title:
+                if not sections:
+                    # Front-matter citations before first real chapter - buffer them
+                    front_matter_buffer.append(content)
+                else:
+                    # Merge with previous section if it exists
+                    prev_content, prev_title = sections[-1]
+                    sections[-1] = (prev_content + "\n\n" + content, prev_title)
+                continue
+
+            # If this is the first real section, prepend buffered front-matter
+            if front_matter_buffer and not sections:
+                content = "\n\n".join(front_matter_buffer) + "\n\n" + content
+                front_matter_buffer = []
+
+            # Skip very small sections (merge with previous)
+            if len(content) < min_section_size and sections:
+                prev_content, prev_title = sections[-1]
+                merged_title = prev_title or title
+                sections[-1] = (prev_content + "\n\n" + content, merged_title)
+                continue
+
+            # If section is too large, split it further using markdown-aware splitter
+            if len(content) > max_section_size:
+                chunks = md_splitter.split_text(content)
+                for i, chunk in enumerate(chunks):
+                    chunk_title = f"{title} (Part {i + 1})" if title else None
+                    sections.append((chunk, chunk_title))
+            else:
+                sections.append((content, title))
+
+        # Filter out empty sections
+        return [(content, title) for content, title in sections if content.strip()]
+
     def detect_sections(self, text: str) -> List[Tuple[int, str, Optional[str]]]:
         """
         Detect logical sections in the text.
+
+        For EPUB-style links, filters out TOC entries by checking if the next lines
+        contain actual content vs more links.
 
         Returns:
             List of tuples: (line_number, section_title, section_start_index)
@@ -52,6 +289,18 @@ class HierarchicalContentProcessor:
                     if not title:
                         title = match.group(0).strip()
 
+                    # For EPUB-style chapter links, check if this is TOC or real content
+                    if pattern.startswith(r"^\["):  # EPUB link pattern
+                        # Check the next few lines to see if they contain real content or just more links
+                        next_lines = lines[i+1:i+10]  # Look at next 10 lines
+                        # Count links vs actual text
+                        link_count = sum(1 for l in next_lines if re.match(r'^\[.*\]\(.*\)', l.strip()))
+                        text_count = sum(1 for l in next_lines if l.strip() and not re.match(r'^\[.*\]\(.*\)', l.strip()))
+
+                        # If mostly links (TOC), skip this entry
+                        if link_count > text_count and link_count > 2:
+                            continue
+
                     # Find the actual start position in the text
                     start_pos = text.find(line)
                     sections.append((i, title, start_pos))
@@ -66,12 +315,13 @@ class HierarchicalContentProcessor:
     def split_into_sections(
         self,
         text: str,
-        min_section_size: int = 500,
-        max_section_size: int = 5000,
-        overlap: int = 100,
+        min_section_size: int = 2000,
+        max_section_size: int = 20000,
+        overlap: int = 200,
     ) -> List[Tuple[str, Optional[str]]]:
         """
         Split text into logical sections with optional titles.
+        Uses markdown-aware splitting when markdown headers are detected.
 
         Args:
             text: The full text to process
@@ -82,6 +332,13 @@ class HierarchicalContentProcessor:
         Returns:
             List of tuples: (section_content, section_title)
         """
+        # Check if content is markdown and use appropriate processing
+        if self._is_markdown_content(text):
+            return self._process_markdown_sections(
+                text, min_section_size, max_section_size, overlap
+            )
+
+        # Fall back to regex-based section detection for non-markdown content
         detected_sections = self.detect_sections(text)
 
         if len(detected_sections) == 1 and detected_sections[0][1] is None:
@@ -95,6 +352,22 @@ class HierarchicalContentProcessor:
         )
 
         for i, (_line_num, title, start_pos) in enumerate(detected_sections):
+            # Clean the title - filter out citations/references
+            cleaned_title = _clean_title(title) if title else None
+
+            # If title was filtered as citation, skip or merge this section
+            if title and not cleaned_title:
+                # This was a citation section, merge with previous if exists
+                if sections:
+                    if i + 1 < len(detected_sections):
+                        end_pos = detected_sections[i + 1][2]
+                    else:
+                        end_pos = len(text)
+                    section_content = text[start_pos:end_pos].strip()
+                    prev_content, prev_title = sections[-1]
+                    sections[-1] = (prev_content + "\n\n" + section_content, prev_title)
+                continue
+
             # Determine end position
             if i + 1 < len(detected_sections):
                 end_pos = detected_sections[i + 1][2]
@@ -111,7 +384,7 @@ class HierarchicalContentProcessor:
                     prev_content, prev_title = sections[-1]
                     sections[-1] = (
                         prev_content + "\n\n" + section_content,
-                        prev_title or title,
+                        prev_title or cleaned_title,
                     )
                     continue
 
@@ -119,10 +392,10 @@ class HierarchicalContentProcessor:
             if len(section_content) > max_section_size:
                 chunks = text_splitter.split_text(section_content)
                 for j, chunk in enumerate(chunks):
-                    chunk_title = f"{title} (Part {j + 1})" if title else None
+                    chunk_title = f"{cleaned_title} (Part {j + 1})" if cleaned_title else None
                     sections.append((chunk, chunk_title))
             else:
-                sections.append((section_content, title))
+                sections.append((section_content, cleaned_title))
 
         # Filter out empty sections
         return [(content, title) for content, title in sections if content.strip()]
@@ -142,9 +415,9 @@ class HierarchicalContentProcessor:
         text: str,
         use_custom_markers: bool = False,
         custom_markers: Optional[List[str]] = None,
-        min_section_size: int = 500,
-        max_section_size: int = 5000,
-        overlap: int = 100,
+        min_section_size: int = 2000,
+        max_section_size: int = 20000,
+        overlap: int = 200,
     ) -> List[Tuple[str, Optional[str]]]:
         """
         Main entry point for processing text.
@@ -179,9 +452,9 @@ class HierarchicalContentProcessor:
 
 def create_sections_from_text(
     text: str,
-    min_section_size: int = 500,
-    max_section_size: int = 5000,
-    overlap: int = 100,
+    min_section_size: int = 2000,
+    max_section_size: int = 20000,
+    overlap: int = 200,
 ) -> List[Tuple[str, Optional[str]]]:
     """
     Convenience function to process text into sections.

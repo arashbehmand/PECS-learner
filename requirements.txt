@@ -3,6 +3,7 @@ nicegui>=1.4.0
 
 # Backend & Data
 langchain>=0.1.0
+langchain-text-splitters>=0.0.1
 python-dotenv>=1.0.0
 openai>=1.12.0
 sqlalchemy>=2.0.0

@@ -244,13 +244,82 @@ class ProjectViewPage:
                                 "text-xs text-green-600 font-semibold"
                             )
 
-                # Open button
+                # Action buttons
+                with ui.row().classes("gap-1"):
+                    # Delete button
+                    ui.button(
+                        icon="delete",
+                        on_click=lambda s=section: self._show_delete_confirmation(s),
+                    ).props("flat dense").classes("text-red-500")
+
+                    # Open button
+                    ui.button(
+                        icon="arrow_forward",
+                        on_click=lambda s=section: ui.navigate.to(
+                            f"/project/{self.project_id}/section/{s.id}"
+                        ),
+                    ).props("flat dense").classes("text-blue-500")
+
+    def _show_delete_confirmation(self, section: Section):
+        """Show confirmation dialog before deleting a section"""
+
+        section_title = section.title or f"Section {section.order_index + 1}"
+
+        with ui.dialog() as dialog, ui.card().classes("w-full max-w-lg"):
+            ui.label("Delete Section?").classes("text-xl font-bold mb-4")
+
+            # Warning message
+            with ui.column().classes("gap-3 mb-4"):
+                ui.label(f'Are you sure you want to delete "{section_title}"?').classes(
+                    "text-gray-700"
+                )
+
+                # Count flashcards associated with this section
+                flashcards = self.db.get_flashcards_by_project(
+                    self.project_id, section_id=section.id
+                )
+                flashcard_count = len(flashcards)
+
+                if flashcard_count > 0:
+                    with ui.card().classes("bg-orange-50 p-3"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("warning").classes("text-orange-600")
+                            ui.label(
+                                f"This will also delete {flashcard_count} associated flashcard{'s' if flashcard_count != 1 else ''}"
+                            ).classes("text-orange-700 text-sm")
+
+                ui.label("This action cannot be undone.").classes(
+                    "text-red-600 font-semibold text-sm"
+                )
+
+            def delete_section():
+                """Perform the deletion"""
+                success = self.db.delete_section(section.id)
+
+                if success:
+                    ui.notify(
+                        f"Deleted section: {section_title}",
+                        color="positive",
+                        position="top",
+                    )
+                    dialog.close()
+                    # Refresh the page to show updated section list
+                    ui.navigate.to(f"/project/{self.project_id}")
+                else:
+                    ui.notify(
+                        "Failed to delete section",
+                        color="negative",
+                        position="top",
+                    )
+
+            # Action buttons
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button("Cancel", on_click=dialog.close).props("flat")
                 ui.button(
-                    icon="arrow_forward",
-                    on_click=lambda s=section: ui.navigate.to(
-                        f"/project/{self.project_id}/section/{s.id}"
-                    ),
-                ).props("flat dense").classes("text-blue-500")
+                    "Delete", icon="delete", on_click=delete_section
+                ).classes("bg-red-500")
+
+        dialog.open()
 
     def _show_anki_export_dialog(self):
         """Show dialog for Anki export options"""
