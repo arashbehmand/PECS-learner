@@ -2,9 +2,11 @@
 Unit tests for Rolling Context Service.
 """
 
+# pylint: disable=unused-argument
+
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -91,9 +93,7 @@ def test_generate_rolling_summary_with_previous(
 ):
     """Test generating rolling summary with previous context."""
     # Set rolling summary for first section
-    temp_db.update_section(
-        sample_sections[0].id, rolling_summary="Previous summary"
-    )
+    temp_db.update_section(sample_sections[0].id, rolling_summary="Previous summary")
 
     result = service.generate_rolling_summary(sample_sections[1].id)
 
@@ -103,7 +103,10 @@ def test_generate_rolling_summary_with_previous(
 
 
 def test_generate_rolling_summary_missing_previous(
-    service, temp_db, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test generating rolling summary when previous section lacks summary."""
     # Second section has no previous summary - should generate it recursively
@@ -121,9 +124,7 @@ def test_generate_rolling_summary_already_exists(
 ):
     """Test that existing summary is returned when force_regenerate=False."""
     # Set existing summary
-    temp_db.update_section(
-        sample_sections[0].id, rolling_summary="Existing summary"
-    )
+    temp_db.update_section(sample_sections[0].id, rolling_summary="Existing summary")
 
     result = service.generate_rolling_summary(
         sample_sections[0].id, force_regenerate=False
@@ -139,9 +140,7 @@ def test_generate_rolling_summary_force_regenerate(
 ):
     """Test force regeneration of existing summary."""
     # Set existing summary
-    temp_db.update_section(
-        sample_sections[0].id, rolling_summary="Old summary"
-    )
+    temp_db.update_section(sample_sections[0].id, rolling_summary="Old summary")
 
     result = service.generate_rolling_summary(
         sample_sections[0].id, force_regenerate=True
@@ -161,7 +160,10 @@ def test_generate_rolling_summary_invalid_section(service, mock_llm_service):
 
 
 def test_generate_rolling_summary_llm_failure(
-    service, temp_db, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test handling LLM failure."""
     mock_llm_service.generate_rolling_summary.return_value = None
@@ -172,7 +174,10 @@ def test_generate_rolling_summary_llm_failure(
 
 
 def test_generate_rolling_summary_truncation(
-    service, temp_db, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test truncation of very long summaries."""
     # Create a summary longer than ROLLING_CONTEXT_MAX_CHARS
@@ -203,7 +208,11 @@ def test_generate_rolling_summary_saves_to_db(
 
 
 def test_generate_rolling_summaries_batch(
-    service, temp_db, sample_project, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_project,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test batch generation of rolling summaries."""
     mock_llm_service.generate_rolling_summary.return_value = "Batch summary"
@@ -217,7 +226,11 @@ def test_generate_rolling_summaries_batch(
 
 
 def test_generate_rolling_summaries_batch_with_callback(
-    service, temp_db, sample_project, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_project,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test batch generation with progress callback."""
     mock_llm_service.generate_rolling_summary.return_value = "Batch summary"
@@ -237,7 +250,10 @@ def test_generate_rolling_summaries_batch_with_callback(
 
 
 def test_generate_rolling_summaries_batch_empty_project(
-    service, temp_db, sample_project, mock_llm_service
+    service,
+    temp_db,
+    sample_project,
+    mock_llm_service,
 ):
     """Test batch generation for project with no sections."""
     results = service.generate_rolling_summaries_batch(sample_project.id)
@@ -254,7 +270,11 @@ def test_generate_rolling_summaries_batch_invalid_project(service, mock_llm_serv
 
 
 def test_generate_rolling_summaries_batch_partial_failure(
-    service, temp_db, sample_project, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_project,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test batch generation with some failures."""
     # First call succeeds, second fails, third will depend on second
@@ -278,7 +298,10 @@ def test_generate_rolling_summaries_batch_partial_failure(
 
 
 def test_generate_study_notes_without_rolling_summary(
-    service, temp_db, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test generating study notes when section lacks rolling summary."""
     mock_llm_service.generate_rolling_summary.return_value = "Generated rolling"
@@ -316,9 +339,7 @@ def test_generate_study_notes_force_regenerate(
     temp_db.update_section(sample_sections[0].id, study_notes="Old notes")
     mock_llm_service.generate_study_notes.return_value = "New notes"
 
-    result = service.generate_study_notes(
-        sample_sections[0].id, force_regenerate=True
-    )
+    result = service.generate_study_notes(sample_sections[0].id, force_regenerate=True)
 
     assert result == "New notes"
     mock_llm_service.generate_study_notes.assert_called()
@@ -349,7 +370,10 @@ def test_generate_study_notes_invalid_section(service, mock_llm_service):
 
 
 def test_generate_study_notes_llm_failure(
-    service, temp_db, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test handling LLM failure during study notes generation."""
     mock_llm_service.generate_study_notes.return_value = None
@@ -375,7 +399,11 @@ def test_generate_study_notes_saves_to_db(
 
 
 def test_generate_study_notes_batch(
-    service, temp_db, sample_project, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_project,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test batch generation of study notes."""
     mock_llm_service.generate_rolling_summary.return_value = "Rolling"
@@ -388,7 +416,11 @@ def test_generate_study_notes_batch(
 
 
 def test_generate_study_notes_batch_with_callback(
-    service, temp_db, sample_project, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_project,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test batch study notes generation with progress callback."""
     mock_llm_service.generate_rolling_summary.return_value = "Rolling"
@@ -406,7 +438,11 @@ def test_generate_study_notes_batch_with_callback(
 
 
 def test_generate_study_notes_batch_includes_rolling_context(
-    service, temp_db, sample_project, sample_sections, mock_llm_service
+    service,
+    temp_db,
+    sample_project,
+    sample_sections,
+    mock_llm_service,
 ):
     """Test that batch generation includes rolling context generation."""
     mock_llm_service.generate_rolling_summary.return_value = "Rolling"
@@ -420,7 +456,10 @@ def test_generate_study_notes_batch_includes_rolling_context(
 
 
 def test_generate_study_notes_batch_empty_project(
-    service, temp_db, sample_project, mock_llm_service
+    service,
+    temp_db,
+    sample_project,
+    mock_llm_service,
 ):
     """Test batch study notes generation for empty project."""
     results = service.generate_study_notes_batch(sample_project.id)
@@ -438,9 +477,7 @@ def test_generate_study_notes_batch_invalid_project(service, mock_llm_service):
 # ===== Edge Cases =====
 
 
-def test_section_without_title(
-    service, temp_db, sample_project, mock_llm_service
-):
+def test_section_without_title(service, temp_db, sample_project, mock_llm_service):
     """Test handling section without title."""
     section = temp_db.create_section(
         sample_project.id, "Content", title=None, order_index=0
@@ -455,9 +492,7 @@ def test_section_without_title(
     assert "Section 1" in call_args["section_title"]
 
 
-def test_empty_section_content(
-    service, temp_db, sample_project, mock_llm_service
-):
+def test_empty_section_content(service, temp_db, sample_project, mock_llm_service):
     """Test handling empty section content."""
     section = temp_db.create_section(sample_project.id, "", 0)
     mock_llm_service.generate_rolling_summary.return_value = "Summary"

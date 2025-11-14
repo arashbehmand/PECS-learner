@@ -5,13 +5,12 @@ Extended unit tests for database operations focusing on edge cases and error han
 import os
 import tempfile
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
 from utils.database import DatabaseRepository
-from utils.models import Flashcard, Project, Section
+from utils.models import Flashcard
 
 
 @pytest.fixture
@@ -165,12 +164,8 @@ def test_delete_project_cascades_sections(temp_db, sample_project):
 def test_delete_project_cascades_flashcards(temp_db, sample_project, sample_section):
     """Test that deleting project also deletes its flashcards."""
     # Create flashcards
-    fc1 = temp_db.create_flashcard(
-        sample_project.id, "Q1?", "A1", sample_section.id
-    )
-    fc2 = temp_db.create_flashcard(
-        sample_project.id, "Q2?", "A2", sample_section.id
-    )
+    fc1 = temp_db.create_flashcard(sample_project.id, "Q1?", "A1", sample_section.id)
+    fc2 = temp_db.create_flashcard(sample_project.id, "Q2?", "A2", sample_section.id)
 
     # Delete project
     result = temp_db.delete_project(sample_project.id)
@@ -184,7 +179,9 @@ def test_delete_project_cascades_flashcards(temp_db, sample_project, sample_sect
 # ===== Flashcard Review Tests =====
 
 
-def test_get_flashcards_for_review_none_due(temp_db, sample_project, sample_flashcard):
+def test_get_flashcards_for_review_none_due(
+    temp_db, sample_project, sample_flashcard
+):  # pylint: disable=unused-argument
     """Test getting flashcards when none are due for review."""
     # Flashcard just created, next_review is in future
     flashcards = temp_db.get_flashcards_for_review(sample_project.id)
@@ -207,6 +204,7 @@ def test_get_flashcards_for_review_with_due_flashcards(
 
     # Give a moment for DB to commit
     import time
+
     time.sleep(0.05)
 
     # Get due flashcards
@@ -235,12 +233,8 @@ def test_get_flashcards_for_review_ordering(temp_db, sample_project, sample_sect
     past1 = datetime.now(UTC) - timedelta(days=2)
     past2 = datetime.now(UTC) - timedelta(days=1)
 
-    fc1 = temp_db.create_flashcard(
-        sample_project.id, "Q1?", "A1", sample_section.id
-    )
-    fc2 = temp_db.create_flashcard(
-        sample_project.id, "Q2?", "A2", sample_section.id
-    )
+    fc1 = temp_db.create_flashcard(sample_project.id, "Q1?", "A1", sample_section.id)
+    fc2 = temp_db.create_flashcard(sample_project.id, "Q2?", "A2", sample_section.id)
 
     # Update review times
     session = temp_db.get_session()
@@ -405,14 +399,10 @@ def test_section_with_null_pecs_data(temp_db, sample_project):
 def test_update_section_pecs_data_merges_correctly(temp_db, sample_section):
     """Test that PECS data updates merge correctly."""
     # Add first phase
-    temp_db.update_section_pecs_data(
-        sample_section.id, "phase1", {"data": "value1"}
-    )
+    temp_db.update_section_pecs_data(sample_section.id, "phase1", {"data": "value1"})
 
     # Add second phase
-    temp_db.update_section_pecs_data(
-        sample_section.id, "phase2", {"data": "value2"}
-    )
+    temp_db.update_section_pecs_data(sample_section.id, "phase2", {"data": "value2"})
 
     # Verify both phases exist
     section = temp_db.get_section(sample_section.id)
