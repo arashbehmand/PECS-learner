@@ -18,8 +18,15 @@ services:
       - PORT=8080
       - PYTHONUNBUFFERED=1
       - NICEGUI_STORAGE_PATH=/app/data/nicegui_storage
-      # Add your OpenAI API key here or use .env file
-      # - OPENAI_API_KEY=your-key-here
+      # LLM Provider API Keys - Add your key here or use .env file (recommended)
+      # Supports OpenAI, Anthropic, Google, and 100+ providers via LiteLLM
+      # - OPENAI_API_KEY=sk-...
+      # - ANTHROPIC_API_KEY=sk-ant-...
+      # - GEMINI_API_KEY=...
+      # Optional: Model configuration (defaults: gpt-5-mini, gpt-5.1)
+      # - LLM_MODEL_FAST=gpt-5-mini
+      # - LLM_MODEL_QUALITY=gpt-5.1
+      # - LLM_MODEL_DEFAULT=gpt-5-mini
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
