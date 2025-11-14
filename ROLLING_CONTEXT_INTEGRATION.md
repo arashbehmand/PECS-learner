@@ -49,6 +49,35 @@ This document describes the integration of two key features from the original do
 - Understanding connections across sections
 - Feynman technique learning aid
 
+## Recent Updates
+
+### v1.1 - LiteLLM Integration & Non-Blocking UI (Latest)
+
+**Major Improvements:**
+
+1. **Replaced OpenAI SDK with LiteLLM**
+   - Now supports multiple LLM providers (OpenAI, Anthropic, Gemini, etc.)
+   - Configure via standard environment variables
+   - Unified API across all providers
+   - Better error handling and provider flexibility
+
+2. **Fixed Blocking UI Issue**
+   - **Problem**: UI froze for 30+ minutes during generation, progress bar stuck at 0%
+   - **Solution**: Background threading with real-time progress updates
+   - Now shows actual progress as sections are processed
+   - UI remains responsive during generation
+   - Progress updates every 100ms via polling
+
+3. **Supported LLM Providers** (via LiteLLM)
+   - OpenAI: `gpt-4o`, `gpt-4o-mini`, `gpt-5-mini`, `gpt-5.1`
+   - Anthropic: `claude-3-opus`, `claude-3-sonnet`, `claude-3-haiku`
+   - Google: `gemini-pro`, `gemini-1.5-pro`
+   - And 100+ other models via LiteLLM
+
+See configuration section below for setup details.
+
+---
+
 ## Architecture
 
 ### Database Schema Changes
@@ -61,15 +90,49 @@ study_notes TEXT      -- Study notes for this section (markdown)
 
 ### Configuration (environment variables)
 
+#### API Keys (choose your provider)
+
 ```bash
-# Model selection (configurable)
-LLM_MODEL_FAST=gpt-4o-mini              # For rolling context generation
-LLM_MODEL_QUALITY=gpt-4o                # For study notes generation
-LLM_MODEL_DEFAULT=gpt-4o-mini           # For general PECS feedback
+# OpenAI (default)
+OPENAI_API_KEY=your_openai_key
+
+# Or Anthropic
+ANTHROPIC_API_KEY=your_anthropic_key
+
+# Or Google Gemini
+GEMINI_API_KEY=your_gemini_key
+
+# LiteLLM supports 100+ providers - see: https://docs.litellm.ai/docs/providers
+```
+
+#### Model Configuration
+
+```bash
+# Model selection (configurable, use any LiteLLM-supported model)
+LLM_MODEL_FAST=gpt-5-mini                    # For rolling context (fast/cheap)
+LLM_MODEL_QUALITY=gpt-5.1                    # For study notes (high quality)
+LLM_MODEL_DEFAULT=gpt-5-mini                 # For general PECS feedback
+
+# Examples for other providers:
+# LLM_MODEL_FAST=claude-3-haiku
+# LLM_MODEL_QUALITY=claude-3-opus
+# LLM_MODEL_DEFAULT=gemini-1.5-pro
 
 # Rolling context limits
-ROLLING_CONTEXT_MAX_CHARS=2000          # Safety net (hard limit)
+ROLLING_CONTEXT_MAX_CHARS=10000         # Safety net (hard limit)
 ROLLING_CONTEXT_TARGET_TOKENS=400       # Target size (~300-400 words)
+
+# Optional: LiteLLM debugging
+LITELLM_VERBOSE=false                   # Set to true for debugging
+```
+
+#### Observability (optional)
+
+```bash
+# Langfuse integration (works with LiteLLM)
+LANGFUSE_PUBLIC_KEY=your_public_key
+LANGFUSE_SECRET_KEY=your_secret_key
+LANGFUSE_HOST=https://cloud.langfuse.com
 ```
 
 ### New Modules
@@ -337,6 +400,26 @@ python nicegui_app/main.py
 - [ ] Export to various formats (PDF, Anki, notion)
 
 ## Troubleshooting
+
+### Progress Bar Not Updating
+
+**Problem**: Progress bar shows 0% for a long time then jumps to 100%
+
+**Solution**: This was fixed in v1.1. Make sure you have the latest version:
+- Run `git pull` to get the latest code
+- Generation now runs in background with real-time updates
+- Progress updates every 100ms
+- UI stays responsive during generation
+
+### LiteLLM Provider Errors
+
+**Problem**: Getting errors with non-OpenAI providers
+
+**Solutions**:
+1. Check API key is set correctly: `echo $ANTHROPIC_API_KEY`
+2. Verify model name is correct for your provider
+3. Enable debug mode: `export LITELLM_VERBOSE=true`
+4. Check [LiteLLM docs](https://docs.litellm.ai/docs/providers) for provider-specific setup
 
 ### Rolling Context Too Long
 - Check `ROLLING_CONTEXT_MAX_CHARS` setting
