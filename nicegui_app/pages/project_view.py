@@ -11,6 +11,8 @@ from nicegui import ui
 from utils.database import DatabaseRepository
 from utils.models import Section
 from utils.anki_export import export_flashcards_to_anki
+from utils.llm_service import LLMService
+from utils.rolling_context_service import RollingContextService
 
 
 class ProjectViewPage:
@@ -112,6 +114,14 @@ class ProjectViewPage:
                         f"/project/{self.project_id}/upload"
                     ),
                 ).classes("bg-blue-500 flex-1 min-w-40")
+
+                # Study Notes Generation button (if sections exist)
+                if len(self.sections) > 0:
+                    ui.button(
+                        "Generate Study Notes",
+                        icon="auto_awesome",
+                        on_click=self._show_study_notes_dialog,
+                    ).classes("bg-indigo-500 flex-1 min-w-40")
 
                 if stats.get("total_flashcards", 0) > 0:
                     ui.button(
@@ -238,6 +248,16 @@ class ProjectViewPage:
                             ui.label(f"{phases_completed}/4 PECS phases").classes(
                                 "text-xs text-blue-600"
                             )
+
+                        # Show study notes indicator
+                        if section.study_notes:
+                            with ui.row().classes("items-center gap-1"):
+                                ui.icon("auto_awesome").classes(
+                                    "text-xs text-indigo-500"
+                                )
+                                ui.label("Study Notes").classes(
+                                    "text-xs text-indigo-600 font-semibold"
+                                )
 
                         if section.is_completed:
                             ui.label("Completed").classes(
@@ -492,5 +512,211 @@ class ProjectViewPage:
                 ui.button(
                     "Export", icon="file_upload", on_click=perform_export
                 ).classes("bg-purple-500")
+
+        dialog.open()
+
+    def _show_study_notes_dialog(self):
+        """Show dialog for generating study notes with rolling context"""
+
+        with ui.dialog() as dialog, ui.card().classes("w-full max-w-3xl"):
+            ui.label("Generate Study Notes").classes("text-xl font-bold mb-4")
+
+            # Check if LLM is available
+            llm_service = LLMService()
+            if not llm_service.is_available():
+                with ui.card().classes("w-full bg-red-50 p-4 mb-4"):
+                    with ui.row().classes("items-center gap-2"):
+                        ui.icon("error").classes("text-red-500 text-2xl")
+                        with ui.column():
+                            ui.label("AI Service Unavailable").classes(
+                                "font-bold text-red-700"
+                            )
+                            ui.label(
+                                "Please configure your OpenAI API key to use this feature."
+                            ).classes("text-sm text-red-600")
+
+                with ui.row().classes("w-full justify-end"):
+                    ui.button("Close", on_click=dialog.close)
+
+                dialog.open()
+                return
+
+            # Description
+            with ui.column().classes("gap-3 mb-4"):
+                ui.label(
+                    "Generate comprehensive study notes for all sections in this project."
+                ).classes("text-gray-700")
+
+                with ui.card().classes("bg-blue-50 p-4"):
+                    ui.label("What will be generated:").classes("font-semibold mb-2")
+                    with ui.column().classes("gap-1"):
+                        ui.label("• Rolling context summaries for each section").classes(
+                            "text-sm"
+                        )
+                        ui.label(
+                            "• Study notes with key concepts, connections, and definitions"
+                        ).classes("text-sm")
+                        ui.label("• Feynman-method style learning notes").classes(
+                            "text-sm"
+                        )
+
+                # Show section count and stats
+                sections_with_context = sum(
+                    1 for s in self.sections if s.rolling_summary
+                )
+                sections_with_notes = sum(1 for s in self.sections if s.study_notes)
+
+                with ui.row().classes("gap-4 flex-wrap"):
+                    with ui.card().classes("px-4 py-2"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("description").classes("text-blue-500")
+                            with ui.column():
+                                ui.label(str(len(self.sections))).classes(
+                                    "text-lg font-bold"
+                                )
+                                ui.label("Total Sections").classes("text-xs text-gray-600")
+
+                    with ui.card().classes("px-4 py-2"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("summarize").classes("text-green-500")
+                            with ui.column():
+                                ui.label(str(sections_with_context)).classes(
+                                    "text-lg font-bold"
+                                )
+                                ui.label("With Context").classes("text-xs text-gray-600")
+
+                    with ui.card().classes("px-4 py-2"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.icon("auto_awesome").classes("text-purple-500")
+                            with ui.column():
+                                ui.label(str(sections_with_notes)).classes(
+                                    "text-lg font-bold"
+                                )
+                                ui.label("With Notes").classes("text-xs text-gray-600")
+
+            # Progress container
+            progress_container = ui.column().classes("w-full mb-4")
+
+            # Status message
+            status_container = ui.column().classes("w-full mb-4")
+
+            # Action buttons
+            button_container = ui.row().classes("w-full justify-end gap-2")
+
+            def perform_generation():
+                """Execute the study notes generation"""
+                button_container.clear()
+
+                with button_container:
+                    ui.button("Close", on_click=dialog.close).props("flat")
+
+                progress_container.clear()
+                status_container.clear()
+
+                with progress_container:
+                    with ui.row().classes("items-center gap-2 w-full"):
+                        ui.spinner(size="md")
+                        progress_label = ui.label("Initializing...").classes(
+                            "text-gray-700 flex-1"
+                        )
+
+                    progress_bar = ui.linear_progress(value=0).classes("w-full mt-2")
+
+                # Start generation in background
+                ui.timer(
+                    0.1,
+                    lambda: _do_generation(progress_label, progress_bar),
+                    once=True,
+                )
+
+            def _do_generation(progress_label, progress_bar):
+                """Perform the actual generation"""
+                import asyncio
+
+                rolling_service = RollingContextService(llm_service, self.db)
+
+                def progress_callback(current, total, message):
+                    """Update progress UI"""
+                    progress_label.text = f"[{current}/{total}] {message}"
+                    progress_bar.value = current / total
+
+                try:
+                    # Generate all study notes (includes rolling context generation)
+                    results = rolling_service.generate_study_notes_batch(
+                        project_id=self.project_id, progress_callback=progress_callback
+                    )
+
+                    # Update status
+                    progress_container.clear()
+                    status_container.clear()
+
+                    successful = sum(1 for v in results.values() if v)
+                    failed = len(results) - successful
+
+                    with status_container:
+                        if successful > 0:
+                            with ui.card().classes("w-full bg-green-50 p-4"):
+                                with ui.row().classes("items-start gap-2"):
+                                    ui.icon("check_circle").classes(
+                                        "text-green-500 text-2xl"
+                                    )
+                                    with ui.column().classes("flex-1"):
+                                        ui.label("Success!").classes(
+                                            "font-bold text-green-700"
+                                        )
+                                        ui.label(
+                                            f"Generated study notes for {successful} section{'s' if successful != 1 else ''}"
+                                        ).classes("text-sm")
+
+                                        if failed > 0:
+                                            ui.label(
+                                                f"⚠️  {failed} section{'s' if failed != 1 else ''} failed"
+                                            ).classes("text-sm text-orange-600 mt-1")
+
+                            ui.label(
+                                "Study notes are now available for each section!"
+                            ).classes("text-sm text-gray-600 mt-2")
+
+                            # Add button to refresh page
+                            with button_container:
+                                ui.button(
+                                    "View Sections",
+                                    icon="refresh",
+                                    on_click=lambda: ui.navigate.to(
+                                        f"/project/{self.project_id}"
+                                    ),
+                                ).classes("bg-green-500")
+                        else:
+                            with ui.card().classes("w-full bg-red-50 p-4"):
+                                with ui.row().classes("items-start gap-2"):
+                                    ui.icon("error").classes("text-red-500 text-2xl")
+                                    with ui.column():
+                                        ui.label("Generation Failed").classes(
+                                            "font-bold text-red-700"
+                                        )
+                                        ui.label(
+                                            "Failed to generate study notes. Please check your API key and try again."
+                                        ).classes("text-sm text-red-600")
+
+                except Exception as e:
+                    progress_container.clear()
+                    status_container.clear()
+
+                    with status_container:
+                        with ui.card().classes("w-full bg-red-50 p-4"):
+                            with ui.row().classes("items-start gap-2"):
+                                ui.icon("error").classes("text-red-500 text-2xl")
+                                with ui.column():
+                                    ui.label("Error").classes("font-bold text-red-700")
+                                    ui.label(str(e)).classes("text-sm text-red-600")
+
+            with button_container:
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+
+                ui.button(
+                    "Generate",
+                    icon="auto_awesome",
+                    on_click=perform_generation,
+                ).classes("bg-indigo-500")
 
         dialog.open()
