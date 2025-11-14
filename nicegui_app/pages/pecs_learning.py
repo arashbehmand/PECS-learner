@@ -1310,45 +1310,72 @@ Be analytical and honest. Don't be overly enthusiastic or artificially encouragi
             ui.notify("AI service unavailable", color="negative", position="top")
             return
 
-        with ui.dialog() as dialog, ui.card().classes("w-full max-w-lg"):
-            ui.label("Regenerate Study Notes").classes("text-xl font-bold mb-4")
+        async def start_regeneration():
+            """Start the regeneration process with async support"""
+            import asyncio
 
-            progress_container = ui.column().classes("w-full mb-4")
+            with ui.dialog() as dialog, ui.card().classes("w-full max-w-lg"):
+                ui.label("Regenerate Study Notes").classes("text-xl font-bold mb-4")
 
-            with progress_container:
-                with ui.row().classes("items-center gap-2"):
-                    ui.spinner(size="md")
-                    ui.label("Generating study notes...").classes("text-gray-700")
+                progress_container = ui.column().classes("w-full mb-4")
+                status_label = ui.label("").classes("text-gray-700")
 
-            def do_regeneration():
-                """Perform the regeneration"""
-                try:
-                    rolling_service = RollingContextService(llm_service, self.db)
+                with progress_container:
+                    with ui.row().classes("items-center gap-2"):
+                        ui.spinner(size="md")
+                        status_label.text = "Starting..."
 
-                    # First ensure rolling context exists
-                    if not self.section.rolling_summary:
-                        progress_container.clear()
-                        with progress_container:
-                            with ui.row().classes("items-center gap-2"):
-                                ui.spinner(size="md")
-                                ui.label("Generating rolling context...").classes(
-                                    "text-gray-700"
-                                )
+                # Shared state
+                state = {
+                    "phase": "starting",
+                    "done": False,
+                    "error": None,
+                    "success": False,
+                }
 
-                        rolling_service.generate_rolling_summary(self.section_id)
+                def run_regeneration():
+                    """Run regeneration in background thread"""
+                    try:
+                        rolling_service = RollingContextService(llm_service, self.db)
 
-                    # Generate study notes
-                    progress_container.clear()
-                    with progress_container:
-                        with ui.row().classes("items-center gap-2"):
-                            ui.spinner(size="md")
-                            ui.label("Generating study notes...").classes("text-gray-700")
+                        # First ensure rolling context exists
+                        if not self.section.rolling_summary:
+                            state["phase"] = "context"
+                            rolling_service.generate_rolling_summary(self.section_id)
 
-                    notes = rolling_service.generate_study_notes(
-                        self.section_id, force_regenerate=True
-                    )
+                        # Generate study notes
+                        state["phase"] = "notes"
+                        notes = rolling_service.generate_study_notes(
+                            self.section_id, force_regenerate=True
+                        )
 
-                    if notes:
+                        if notes:
+                            state["success"] = True
+                        else:
+                            state["error"] = "Failed to generate study notes"
+
+                        state["done"] = True
+
+                    except Exception as e:
+                        state["error"] = str(e)
+                        state["done"] = True
+
+                # Start in background
+                asyncio.create_task(asyncio.to_thread(run_regeneration))
+
+                # Poll for updates
+                def update_ui():
+                    """Update UI based on state"""
+                    if not state["done"]:
+                        # Update status message
+                        if state["phase"] == "context":
+                            status_label.text = "Generating rolling context..."
+                        elif state["phase"] == "notes":
+                            status_label.text = "Generating study notes..."
+                        return  # Keep polling
+
+                    # Done - show result
+                    if state["success"]:
                         dialog.close()
                         ui.notify(
                             "Study notes regenerated!", color="positive", position="top"
@@ -1358,17 +1385,16 @@ Be analytical and honest. Don't be overly enthusiastic or artificially encouragi
                         progress_container.clear()
                         with progress_container:
                             with ui.card().classes("bg-red-50 p-4"):
-                                ui.label("Failed to generate study notes").classes(
-                                    "text-red-700"
-                                )
+                                ui.label(
+                                    state["error"] or "Unknown error"
+                                ).classes("text-red-700")
 
-                except Exception as e:
-                    progress_container.clear()
-                    with progress_container:
-                        with ui.card().classes("bg-red-50 p-4"):
-                            ui.label(f"Error: {str(e)}").classes("text-red-700")
+                    return False  # Stop polling
 
-            # Start generation
-            ui.timer(0.1, do_regeneration, once=True)
+                # Poll every 100ms
+                ui.timer(0.1, update_ui)
 
-        dialog.open()
+            dialog.open()
+
+        # Start the regeneration
+        start_regeneration()

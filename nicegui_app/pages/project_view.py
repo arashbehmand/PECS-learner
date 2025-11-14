@@ -603,8 +603,10 @@ class ProjectViewPage:
             # Action buttons
             button_container = ui.row().classes("w-full justify-end gap-2")
 
-            def perform_generation():
+            async def perform_generation():
                 """Execute the study notes generation"""
+                import asyncio
+
                 button_container.clear()
 
                 with button_container:
@@ -622,93 +624,117 @@ class ProjectViewPage:
 
                     progress_bar = ui.linear_progress(value=0).classes("w-full mt-2")
 
-                # Start generation in background
-                ui.timer(
-                    0.1,
-                    lambda: _do_generation(progress_label, progress_bar),
-                    once=True,
-                )
-
-            def _do_generation(progress_label, progress_bar):
-                """Perform the actual generation"""
-                import asyncio
-
-                rolling_service = RollingContextService(llm_service, self.db)
+                # Shared state for progress tracking
+                state = {
+                    "current": 0,
+                    "total": 0,
+                    "message": "Initializing...",
+                    "done": False,
+                    "error": None,
+                    "results": None,
+                }
 
                 def progress_callback(current, total, message):
-                    """Update progress UI"""
-                    progress_label.text = f"[{current}/{total}] {message}"
-                    progress_bar.value = current / total
+                    """Update progress state (called from background thread)"""
+                    state["current"] = current
+                    state["total"] = total
+                    state["message"] = message
 
-                try:
-                    # Generate all study notes (includes rolling context generation)
-                    results = rolling_service.generate_study_notes_batch(
-                        project_id=self.project_id, progress_callback=progress_callback
-                    )
+                def run_generation():
+                    """Run generation in background thread"""
+                    try:
+                        rolling_service = RollingContextService(llm_service, self.db)
+                        results = rolling_service.generate_study_notes_batch(
+                            project_id=self.project_id,
+                            progress_callback=progress_callback
+                        )
+                        state["results"] = results
+                        state["done"] = True
+                    except Exception as e:
+                        state["error"] = str(e)
+                        state["done"] = True
 
-                    # Update status
+                # Start generation in background thread
+                asyncio.create_task(asyncio.to_thread(run_generation))
+
+                # Poll for progress updates
+                def update_ui():
+                    """Update UI based on current state"""
+                    if not state["done"]:
+                        # Update progress
+                        if state["total"] > 0:
+                            progress_label.text = f"[{state['current']}/{state['total']}] {state['message']}"
+                            progress_bar.value = state["current"] / state["total"]
+                        return  # Keep polling
+
+                    # Generation complete - show results
                     progress_container.clear()
                     status_container.clear()
 
-                    successful = sum(1 for v in results.values() if v)
-                    failed = len(results) - successful
-
-                    with status_container:
-                        if successful > 0:
-                            with ui.card().classes("w-full bg-green-50 p-4"):
-                                with ui.row().classes("items-start gap-2"):
-                                    ui.icon("check_circle").classes(
-                                        "text-green-500 text-2xl"
-                                    )
-                                    with ui.column().classes("flex-1"):
-                                        ui.label("Success!").classes(
-                                            "font-bold text-green-700"
-                                        )
-                                        ui.label(
-                                            f"Generated study notes for {successful} section{'s' if successful != 1 else ''}"
-                                        ).classes("text-sm")
-
-                                        if failed > 0:
-                                            ui.label(
-                                                f"⚠️  {failed} section{'s' if failed != 1 else ''} failed"
-                                            ).classes("text-sm text-orange-600 mt-1")
-
-                            ui.label(
-                                "Study notes are now available for each section!"
-                            ).classes("text-sm text-gray-600 mt-2")
-
-                            # Add button to refresh page
-                            with button_container:
-                                ui.button(
-                                    "View Sections",
-                                    icon="refresh",
-                                    on_click=lambda: ui.navigate.to(
-                                        f"/project/{self.project_id}"
-                                    ),
-                                ).classes("bg-green-500")
-                        else:
+                    if state["error"]:
+                        # Show error
+                        with status_container:
                             with ui.card().classes("w-full bg-red-50 p-4"):
                                 with ui.row().classes("items-start gap-2"):
                                     ui.icon("error").classes("text-red-500 text-2xl")
                                     with ui.column():
-                                        ui.label("Generation Failed").classes(
-                                            "font-bold text-red-700"
+                                        ui.label("Error").classes("font-bold text-red-700")
+                                        ui.label(state["error"]).classes("text-sm text-red-600")
+                    elif state["results"]:
+                        # Show success
+                        successful = sum(1 for v in state["results"].values() if v)
+                        failed = len(state["results"]) - successful
+
+                        with status_container:
+                            if successful > 0:
+                                with ui.card().classes("w-full bg-green-50 p-4"):
+                                    with ui.row().classes("items-start gap-2"):
+                                        ui.icon("check_circle").classes(
+                                            "text-green-500 text-2xl"
                                         )
-                                        ui.label(
-                                            "Failed to generate study notes. Please check your API key and try again."
-                                        ).classes("text-sm text-red-600")
+                                        with ui.column().classes("flex-1"):
+                                            ui.label("Success!").classes(
+                                                "font-bold text-green-700"
+                                            )
+                                            ui.label(
+                                                f"Generated study notes for {successful} section{'s' if successful != 1 else ''}"
+                                            ).classes("text-sm")
 
-                except Exception as e:
-                    progress_container.clear()
-                    status_container.clear()
+                                            if failed > 0:
+                                                ui.label(
+                                                    f"⚠️  {failed} section{'s' if failed != 1 else ''} failed"
+                                                ).classes("text-sm text-orange-600 mt-1")
 
-                    with status_container:
-                        with ui.card().classes("w-full bg-red-50 p-4"):
-                            with ui.row().classes("items-start gap-2"):
-                                ui.icon("error").classes("text-red-500 text-2xl")
-                                with ui.column():
-                                    ui.label("Error").classes("font-bold text-red-700")
-                                    ui.label(str(e)).classes("text-sm text-red-600")
+                                ui.label(
+                                    "Study notes are now available for each section!"
+                                ).classes("text-sm text-gray-600 mt-2")
+
+                                # Add button to refresh page
+                                with button_container:
+                                    ui.button(
+                                        "View Sections",
+                                        icon="refresh",
+                                        on_click=lambda: ui.navigate.to(
+                                            f"/project/{self.project_id}"
+                                        ),
+                                    ).classes("bg-green-500")
+                            else:
+                                with ui.card().classes("w-full bg-red-50 p-4"):
+                                    with ui.row().classes("items-start gap-2"):
+                                        ui.icon("error").classes("text-red-500 text-2xl")
+                                        with ui.column():
+                                            ui.label("Generation Failed").classes(
+                                                "font-bold text-red-700"
+                                            )
+                                            ui.label(
+                                                "Failed to generate study notes. Please check your API key and try again."
+                                            ).classes("text-sm text-red-600")
+
+                    # Stop polling once done
+                    return False
+
+                # Poll every 100ms
+                ui.timer(0.1, update_ui)
 
             with button_container:
                 ui.button("Cancel", on_click=dialog.close).props("flat")

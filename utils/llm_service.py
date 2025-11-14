@@ -5,13 +5,17 @@ import re
 from typing import Dict, List, Optional
 
 import yaml
-from langfuse.openai import OpenAI as LangfuseOpenAI
-from openai import OpenAI
+import litellm
+from litellm import completion
 
 from nicegui_app.config import LLM_MODEL_DEFAULT, LLM_MODEL_FAST, LLM_MODEL_QUALITY
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+# Configure LiteLLM
+litellm.drop_params = True  # Drop unsupported params instead of erroring
+litellm.set_verbose = os.getenv("LITELLM_VERBOSE", "false").lower() == "true"
 
 
 def extract_json_from_markdown(content: str) -> str:
@@ -38,35 +42,35 @@ class LLMService:
         with open("utils/prompts.yaml", "r", encoding="utf-8") as f:
             self.prompts = yaml.safe_load(f)
 
-        # Get the API key from environment variable
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        # Check if API key is available (LiteLLM reads from env automatically)
+        self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("GEMINI_API_KEY")
 
-        # Initialize client if we have an API key
-        if self.api_key:
-            # Use Langfuse for observability if configured, otherwise standard OpenAI client
-            # Langfuse SDK reads LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and LANGFUSE_HOST
-            # from environment variables automatically
-            langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
-            langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+        # Configure Langfuse for observability (if available)
+        langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
+        langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
+        langfuse_host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
 
-            if langfuse_public_key and langfuse_secret_key:
-                try:
-                    self.client = LangfuseOpenAI(api_key=self.api_key)
-                    logger.info("LLM service initialized with Langfuse observability")
-                except TypeError as e:
-                    logger.warning(
-                        "Langfuse client init failed (%s). Falling back to standard OpenAI client.",
-                        e,
-                    )
-                    self.client = OpenAI(api_key=self.api_key)
-            else:
-                self.client = OpenAI(api_key=self.api_key)
-                logger.info(
-                    "LLM service initialized without observability (set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY for tracking)"
+        if langfuse_public_key and langfuse_secret_key:
+            try:
+                # Enable Langfuse integration with LiteLLM
+                litellm.success_callback = ["langfuse"]
+                litellm.failure_callback = ["langfuse"]
+                os.environ.setdefault("LANGFUSE_PUBLIC_KEY", langfuse_public_key)
+                os.environ.setdefault("LANGFUSE_SECRET_KEY", langfuse_secret_key)
+                os.environ.setdefault("LANGFUSE_HOST", langfuse_host)
+                logger.info("LLM service initialized with Langfuse observability via LiteLLM")
+            except Exception as e:
+                logger.warning(
+                    "Langfuse integration failed (%s). Continuing without observability.",
+                    e,
                 )
         else:
-            self.client = None
-            logger.warning("No OpenAI API key found. LLM features will be unavailable.")
+            logger.info(
+                "LLM service initialized without observability (set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY for tracking)"
+            )
+
+        if not self.api_key:
+            logger.warning("No API key found. LLM features will be unavailable. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY.")
 
         # Configure models from config (configurable via environment variables)
         self.model = LLM_MODEL_DEFAULT  # Default model for general tasks
@@ -75,7 +79,7 @@ class LLMService:
 
     def is_available(self) -> bool:
         """Check if LLM service is available (API key configured)."""
-        return self.client is not None and self.prompts is not None
+        return self.api_key is not None and self.prompts is not None
 
     def _get_prompt(self, module: str, prompt_type: str) -> Optional[Dict[str, str]]:
         """Get prompt template from YAML configuration."""
@@ -94,7 +98,7 @@ class LLMService:
             return None
 
         try:
-            response = self.client.chat.completions.create(
+            response = completion(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -260,7 +264,7 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
 
             logger.debug(f"Flashcard generation prompt length: {len(prompt)} chars")
 
-            response = self.client.chat.completions.create(
+            response = completion(
                 model=self.model,
                 messages=[
                     {
@@ -347,7 +351,7 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
 
             Return the response as a JSON array of objects, each with 'question' and 'answer' fields."""
 
-            response = self.client.chat.completions.create(
+            response = completion(
                 model=self.model,
                 messages=[
                     {
@@ -414,7 +418,7 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
         )
 
         try:
-            response = self.client.chat.completions.create(
+            response = completion(
                 model=self.model_fast,  # Use fast model for rolling context
                 messages=[
                     {"role": "system", "content": prompt["system"]},
@@ -461,7 +465,7 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
         )
 
         try:
-            response = self.client.chat.completions.create(
+            response = completion(
                 model=self.model_quality,  # Use quality model for study notes
                 messages=[
                     {"role": "system", "content": prompt["system"]},
@@ -496,7 +500,7 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
         user_prompt = prompt["user"].format(all_section_notes=formatted_notes)
 
         try:
-            response = self.client.chat.completions.create(
+            response = completion(
                 model=self.model_quality,  # Use quality model
                 messages=[
                     {"role": "system", "content": prompt["system"]},
@@ -528,7 +532,7 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
         user_prompt = prompt["user"].format(draft_notes=draft_notes)
 
         try:
-            response = self.client.chat.completions.create(
+            response = completion(
                 model=self.model_quality,  # Use quality model
                 messages=[
                     {"role": "system", "content": prompt["system"]},
