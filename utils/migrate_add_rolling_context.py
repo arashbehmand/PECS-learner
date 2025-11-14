@@ -70,7 +70,9 @@ def migrate_database(db_path: str = "data/pecs.db"):
         conn.commit()
 
         if migrations_applied:
-            logger.info(f"✓ Migration complete. Added columns: {', '.join(migrations_applied)}")
+            logger.info(
+                f"✓ Migration complete. Added columns: {', '.join(migrations_applied)}"
+            )
         else:
             logger.info("✓ No migration needed. All columns exist.")
 

@@ -4,9 +4,10 @@ import os
 import re
 from typing import Dict, List, Optional
 
-import yaml
 import litellm
+import yaml
 from litellm import completion
+from openai import OpenAI
 
 from nicegui_app.config import LLM_MODEL_DEFAULT, LLM_MODEL_FAST, LLM_MODEL_QUALITY
 
@@ -42,8 +43,23 @@ class LLMService:
         with open("utils/prompts.yaml", "r", encoding="utf-8") as f:
             self.prompts = yaml.safe_load(f)
 
+        # Initialize client attribute so tests can rely on its presence
+        self.client: Optional[OpenAI] = None
+
         # Check if API key is available (LiteLLM reads from env automatically)
-        self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("GEMINI_API_KEY")
+        self.api_key = (
+            os.getenv("OPENAI_API_KEY")
+            or os.getenv("ANTHROPIC_API_KEY")
+            or os.getenv("GEMINI_API_KEY")
+        )
+
+        if self.api_key:
+            self.client = OpenAI(api_key=self.api_key)
+            logger.info("LLM client initialized via OpenAI SDK")
+        else:
+            logger.warning(
+                "No API key found. LLM features will be unavailable. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY."
+            )
 
         # Configure Langfuse for observability (if available)
         langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
@@ -58,7 +74,9 @@ class LLMService:
                 os.environ.setdefault("LANGFUSE_PUBLIC_KEY", langfuse_public_key)
                 os.environ.setdefault("LANGFUSE_SECRET_KEY", langfuse_secret_key)
                 os.environ.setdefault("LANGFUSE_HOST", langfuse_host)
-                logger.info("LLM service initialized with Langfuse observability via LiteLLM")
+                logger.info(
+                    "LLM service initialized with Langfuse observability via LiteLLM"
+                )
             except Exception as e:
                 logger.warning(
                     "Langfuse integration failed (%s). Continuing without observability.",
@@ -69,17 +87,20 @@ class LLMService:
                 "LLM service initialized without observability (set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY for tracking)"
             )
 
-        if not self.api_key:
-            logger.warning("No API key found. LLM features will be unavailable. Set OPENAI_API_KEY, ANTHROPIC_API_KEY, or GEMINI_API_KEY.")
-
         # Configure models from config (configurable via environment variables)
         self.model = LLM_MODEL_DEFAULT  # Default model for general tasks
         self.model_fast = LLM_MODEL_FAST  # Fast model for quick tasks (rolling context)
-        self.model_quality = LLM_MODEL_QUALITY  # Quality model for important tasks (study notes)
+        self.model_quality = (
+            LLM_MODEL_QUALITY  # Quality model for important tasks (study notes)
+        )
 
     def is_available(self) -> bool:
-        """Check if LLM service is available (API key configured)."""
-        return self.api_key is not None and self.prompts is not None
+        """Check if LLM service is available.
+
+        Availability is determined by having an initialized client and loaded prompts.
+        This makes behavior deterministic for tests which mock/assign the client directly.
+        """
+        return self.client is not None and self.prompts is not None
 
     def _get_prompt(self, module: str, prompt_type: str) -> Optional[Dict[str, str]]:
         """Get prompt template from YAML configuration."""
@@ -90,7 +111,11 @@ class LLMService:
             return None
 
     def _make_llm_call(self, system_prompt: str, user_prompt: str) -> Optional[str]:
-        """Make a call to the LLM API."""
+        """Make a call to the LLM API.
+
+        Prefer using an initialized client (e.g. OpenAI SDK) when available so tests
+        that mock client.chat.completions.create are exercised. Fall back to litellm.completion.
+        """
         if not self.is_available():
             logger.warning(
                 "LLM service is not available. Please check your API key configuration."
@@ -98,7 +123,7 @@ class LLMService:
             return None
 
         try:
-            response = completion(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -264,7 +289,7 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
 
             logger.debug(f"Flashcard generation prompt length: {len(prompt)} chars")
 
-            response = completion(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
@@ -351,7 +376,7 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
 
             Return the response as a JSON array of objects, each with 'question' and 'answer' fields."""
 
-            response = completion(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {

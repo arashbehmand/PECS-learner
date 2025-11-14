@@ -7,12 +7,9 @@ sections and generates study notes with full context.
 """
 
 import logging
-from typing import Dict, List, Optional, Callable
+from typing import Callable, Dict, Optional
 
-from nicegui_app.config import (
-    ROLLING_CONTEXT_MAX_CHARS,
-    ROLLING_CONTEXT_TARGET_TOKENS,
-)
+from nicegui_app.config import ROLLING_CONTEXT_MAX_CHARS
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +56,9 @@ class RollingContextService:
 
         # Get all previous sections in order
         all_sections = self.db.get_sections_by_project(section.project_id)
-        previous_sections = [s for s in all_sections if s.order_index < section.order_index]
+        previous_sections = [
+            s for s in all_sections if s.order_index < section.order_index
+        ]
 
         # Get the previous section's rolling summary (if exists)
         previous_summary = ""
@@ -87,7 +86,9 @@ class RollingContextService:
             )
 
             if not rolling_summary:
-                logger.error(f"LLM failed to generate rolling summary for section {section_id}")
+                logger.error(
+                    f"LLM failed to generate rolling summary for section {section_id}"
+                )
                 return None
 
             # Apply safety truncation if needed
@@ -148,7 +149,9 @@ class RollingContextService:
             results[section.id] = summary is not None
 
             if not summary:
-                logger.error(f"Failed to generate rolling summary for section {section.id}")
+                logger.error(
+                    f"Failed to generate rolling summary for section {section.id}"
+                )
                 # Continue with next section even if one fails
 
         successful = sum(1 for v in results.values() if v)
@@ -201,7 +204,9 @@ class RollingContextService:
             )
 
             if not study_notes:
-                logger.error(f"LLM failed to generate study notes for section {section_id}")
+                logger.error(
+                    f"LLM failed to generate study notes for section {section_id}"
+                )
                 return None
 
             # Save to database
@@ -243,7 +248,9 @@ class RollingContextService:
         current_step = 0
         results = {}
 
-        logger.info(f"Starting batch study notes generation for {len(sections)} sections")
+        logger.info(
+            f"Starting batch study notes generation for {len(sections)} sections"
+        )
 
         # Phase 1: Generate all rolling summaries
         for section in sections:
@@ -257,7 +264,9 @@ class RollingContextService:
 
             summary = self.generate_rolling_summary(section.id, force_regenerate=False)
             if not summary:
-                logger.error(f"Failed to generate rolling summary for section {section.id}")
+                logger.error(
+                    f"Failed to generate rolling summary for section {section.id}"
+                )
                 results[section.id] = False
                 continue
 
@@ -316,9 +325,9 @@ class RollingContextService:
 
         # Challenge phase
         challenge_data = pecs_data.get("challenge_connect", {})
-        critical_thinking = challenge_data.get("critical_questions") or challenge_data.get(
-            "critical_thinking"
-        )
+        critical_thinking = challenge_data.get(
+            "critical_questions"
+        ) or challenge_data.get("critical_thinking")
         if critical_thinking:
             parts.append(
                 f"Critical Analysis: {critical_thinking[:200]}..."

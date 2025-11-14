@@ -4,14 +4,15 @@
 Project View Page - Shows project overview and section list
 """
 
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
 from nicegui import ui
 
-from utils.database import DatabaseRepository
-from utils.models import Section
 from utils.anki_export import export_flashcards_to_anki
+from utils.database import DatabaseRepository
 from utils.llm_service import LLMService
+from utils.models import Section
 from utils.rolling_context_service import RollingContextService
 
 
@@ -335,9 +336,9 @@ class ProjectViewPage:
             # Action buttons
             with ui.row().classes("w-full justify-end gap-2"):
                 ui.button("Cancel", on_click=dialog.close).props("flat")
-                ui.button(
-                    "Delete", icon="delete", on_click=delete_section
-                ).classes("bg-red-500")
+                ui.button("Delete", icon="delete", on_click=delete_section).classes(
+                    "bg-red-500"
+                )
 
         dialog.open()
 
@@ -550,9 +551,9 @@ class ProjectViewPage:
                 with ui.card().classes("bg-blue-50 p-4"):
                     ui.label("What will be generated:").classes("font-semibold mb-2")
                     with ui.column().classes("gap-1"):
-                        ui.label("• Rolling context summaries for each section").classes(
-                            "text-sm"
-                        )
+                        ui.label(
+                            "• Rolling context summaries for each section"
+                        ).classes("text-sm")
                         ui.label(
                             "• Study notes with key concepts, connections, and definitions"
                         ).classes("text-sm")
@@ -574,7 +575,9 @@ class ProjectViewPage:
                                 ui.label(str(len(self.sections))).classes(
                                     "text-lg font-bold"
                                 )
-                                ui.label("Total Sections").classes("text-xs text-gray-600")
+                                ui.label("Total Sections").classes(
+                                    "text-xs text-gray-600"
+                                )
 
                     with ui.card().classes("px-4 py-2"):
                         with ui.row().classes("items-center gap-2"):
@@ -583,7 +586,9 @@ class ProjectViewPage:
                                 ui.label(str(sections_with_context)).classes(
                                     "text-lg font-bold"
                                 )
-                                ui.label("With Context").classes("text-xs text-gray-600")
+                                ui.label("With Context").classes(
+                                    "text-xs text-gray-600"
+                                )
 
                     with ui.card().classes("px-4 py-2"):
                         with ui.row().classes("items-center gap-2"):
@@ -646,7 +651,7 @@ class ProjectViewPage:
                         rolling_service = RollingContextService(llm_service, self.db)
                         results = rolling_service.generate_study_notes_batch(
                             project_id=self.project_id,
-                            progress_callback=progress_callback
+                            progress_callback=progress_callback,
                         )
                         state["results"] = results
                         state["done"] = True
@@ -665,7 +670,7 @@ class ProjectViewPage:
                         if state["total"] > 0:
                             progress_label.text = f"[{state['current']}/{state['total']}] {state['message']}"
                             progress_bar.value = state["current"] / state["total"]
-                        return  # Keep polling
+                        return True  # Keep polling
 
                     # Generation complete - show results
                     progress_container.clear()
@@ -678,8 +683,12 @@ class ProjectViewPage:
                                 with ui.row().classes("items-start gap-2"):
                                     ui.icon("error").classes("text-red-500 text-2xl")
                                     with ui.column():
-                                        ui.label("Error").classes("font-bold text-red-700")
-                                        ui.label(state["error"]).classes("text-sm text-red-600")
+                                        ui.label("Error").classes(
+                                            "font-bold text-red-700"
+                                        )
+                                        ui.label(state["error"]).classes(
+                                            "text-sm text-red-600"
+                                        )
                     elif state["results"]:
                         # Show success
                         successful = sum(1 for v in state["results"].values() if v)
@@ -703,7 +712,9 @@ class ProjectViewPage:
                                             if failed > 0:
                                                 ui.label(
                                                     f"⚠️  {failed} section{'s' if failed != 1 else ''} failed"
-                                                ).classes("text-sm text-orange-600 mt-1")
+                                                ).classes(
+                                                    "text-sm text-orange-600 mt-1"
+                                                )
 
                                 ui.label(
                                     "Study notes are now available for each section!"
@@ -721,7 +732,9 @@ class ProjectViewPage:
                             else:
                                 with ui.card().classes("w-full bg-red-50 p-4"):
                                     with ui.row().classes("items-start gap-2"):
-                                        ui.icon("error").classes("text-red-500 text-2xl")
+                                        ui.icon("error").classes(
+                                            "text-red-500 text-2xl"
+                                        )
                                         with ui.column():
                                             ui.label("Generation Failed").classes(
                                                 "font-bold text-red-700"

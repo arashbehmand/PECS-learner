@@ -284,7 +284,9 @@ class ContentUploadPage:
                 .classes("w-full")
                 .props("label-always")
             )
-            ui.label("Maximum Section Size (characters, ~3-30 pages)").classes("text-sm")
+            ui.label("Maximum Section Size (characters, ~3-30 pages)").classes(
+                "text-sm"
+            )
 
             overlap_slider = (
                 ui.slider(min=0, max=1000, value=200, step=100)

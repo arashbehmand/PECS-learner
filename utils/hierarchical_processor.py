@@ -8,9 +8,9 @@ import re
 from typing import List, Optional, Tuple
 
 from langchain_text_splitters import (
-    RecursiveCharacterTextSplitter,
     MarkdownHeaderTextSplitter,
     MarkdownTextSplitter,
+    RecursiveCharacterTextSplitter,
 )
 
 
@@ -25,83 +25,68 @@ def _clean_title(title: str) -> Optional[str]:
     Returns:
         Cleaned title string, or None if this looks like a citation
     """
-    if not title:
+    # Work with a mutable result variable and return only once at the end to reduce return statements.
+    result: Optional[str] = title
+    original_title = title or ""
+
+    # Normalize empty input early
+    if not result:
         return None
 
-    original_title = title  # Keep for citation pattern checking
+    # Preliminary citation-like check (before cleaning)
+    lowered = result.lower().strip()
+    if lowered.startswith(("here ", "see ", "cf. ", "e.g. ", "i.e. ", "ibid")):
+        result = None
+    else:
+        # Check for bibliography/citation patterns (before cleaning)
+        citation_indicators = 0
 
-    # Check if this looks like a citation/reference BEFORE cleaning
-    # Citations typically start with certain keywords
-    if title.lower().strip().startswith(("here ", "see ", "cf. ", "e.g. ", "i.e. ", "ibid")):
+        if re.match(r"^[A-Z][a-z]+,\s", result):
+            citation_indicators += 2
+        if re.search(r"\b(19|20)\d{2}\b", result):
+            citation_indicators += 1
+        if "http" in result.lower() or re.search(r"www\.\S+", result):
+            citation_indicators += 2
+        if re.search(
+            r"\b(Journal|Review|Post|Times|Magazine|Press|Publishing)\b",
+            result,
+            re.IGNORECASE,
+        ):
+            citation_indicators += 1
+        if re.search(r"\b(vol\.|pp\.|p\.|no\.|doi:)", result, re.IGNORECASE):
+            citation_indicators += 2
+        punct_count = (
+            result.count(",")
+            + result.count(":")
+            + result.count(";")
+            + result.count(".")
+        )
+        if punct_count > 5:
+            citation_indicators += 1
+        if citation_indicators >= 3:
+            result = None
+
+    # If rejected as citation, return None
+    if result is None:
         return None
 
-    # Check for bibliography/citation patterns (before cleaning)
-    # Pattern 1: Author name with comma (Last, First or Author, 'Title')
-    # Pattern 2: Contains year in format (YYYY)
-    # Pattern 3: Contains publication markers
-    citation_indicators = 0
+    # Now perform cleaning steps
+    cleaned = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", result)  # [text](url) -> text
+    cleaned = re.sub(r"<https?://[^>]+>", "", cleaned)  # remove angled urls
+    cleaned = re.sub(r"https?://\S+", "", cleaned)  # remove inline urls
+    cleaned = re.sub(r"<[^>]+>", "", cleaned)  # strip html tags
+    cleaned = re.sub(r"[*_`]+", "", cleaned)  # strip markdown formatting
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()  # normalize whitespace
 
-    # Check for author-name pattern at start (Name, or Name., or Name,')
-    if re.match(r"^[A-Z][a-z]+,\s", title):
-        citation_indicators += 2  # Strong indicator
-
-    # Check for 4-digit years (common in citations)
-    if re.search(r'\b(19|20)\d{2}\b', title):
-        citation_indicators += 1
-
-    # Check for URLs (very strong indicator)
-    if 'http' in title.lower() or re.search(r'www\.\S+', title):
-        citation_indicators += 2
-
-    # Check for publication/journal patterns
-    if re.search(r'\b(Journal|Review|Post|Times|Magazine|Press|Publishing)\b', title, re.IGNORECASE):
-        citation_indicators += 1
-
-    # Check for volume/issue patterns like "vol." or "pp."
-    if re.search(r'\b(vol\.|pp\.|p\.|no\.|doi:)', title, re.IGNORECASE):
-        citation_indicators += 2
-
-    # Count punctuation density BEFORE cleaning (citations have many commas, colons, semicolons)
-    punct_count = title.count(',') + title.count(':') + title.count(';') + title.count('.')
-    if punct_count > 5:  # More than 5 punctuation marks is likely a citation
-        citation_indicators += 1
-
-    # If enough citation indicators, reject as citation
-    if citation_indicators >= 3:
+    # Heuristic checks after cleaning
+    if not cleaned:
         return None
-
-    # Now clean the title
-    # Remove markdown links: [text](url) -> text
-    title = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', title)
-
-    # Remove standalone URLs in angle brackets: <url>
-    title = re.sub(r'<https?://[^>]+>', '', title)
-
-    # Remove standalone URLs
-    title = re.sub(r'https?://\S+', '', title)
-
-    # Remove HTML tags
-    title = re.sub(r'<[^>]+>', '', title)
-
-    # Remove markdown formatting (bold, italic, etc.)
-    title = re.sub(r'[*_`]+', '', title)
-
-    # Remove multiple spaces and trim
-    title = re.sub(r'\s+', ' ', title).strip()
-
-    # If title is too long (likely not a real title), it's probably a citation
-    if len(title) > 200:
+    if len(cleaned) > 200:
         return None
+    if len(cleaned) < 20 and len(original_title) > 100:
+        return None  # likely mostly URLs/formatting removed
 
-    # If title is empty after cleaning
-    if not title:
-        return None
-
-    # Final check: if cleaned title is very short but original was long (lots of URLs removed)
-    if len(title) < 20 and len(original_title) > 100:
-        return None  # Probably was mostly URLs/formatting
-
-    return title
+    return cleaned
 
 
 class HierarchicalContentProcessor:
@@ -149,21 +134,22 @@ class HierarchicalContentProcessor:
             if match:
                 header_text = match.group(1)
                 # Skip headers that are likely citations/references/URLs
-                # Real headers are typically:
-                # - Not starting with "here" (references like "here some text:")
-                # - Not mostly URLs
-                # - Not too long (> 150 chars is likely a citation)
-                # - Contains actual words, not just punctuation
                 if (
                     not header_text.lower().startswith("here ")
                     and "http" not in header_text.lower()
                     and len(header_text) < 150
-                    and re.search(r'\w{3,}', header_text)  # At least one 3+ char word
+                    and re.search(r"\w{3,}", header_text)
                 ):
                     real_header_count += 1
 
         # Require at least 3 real headers to consider it structured markdown
         return real_header_count >= 3
+
+    def is_markdown_content(self, text: str) -> bool:
+        """
+        Public wrapper for tests and external callers to avoid accessing protected member.
+        """
+        return self._is_markdown_content(text)
 
     def _process_markdown_sections(
         self,
@@ -223,7 +209,9 @@ class HierarchicalContentProcessor:
                         cleaned = _clean_title(doc.metadata[key])
                         if cleaned:  # Only add non-empty cleaned titles
                             title_parts.append(cleaned)
-                        elif doc.metadata[key]:  # Had a title but cleaning returned None (citation)
+                        elif doc.metadata[
+                            key
+                        ]:  # Had a title but cleaning returned None (citation)
                             is_citation_section = True
                 title = " > ".join(title_parts) if title_parts else None
 
@@ -292,10 +280,19 @@ class HierarchicalContentProcessor:
                     # For EPUB-style chapter links, check if this is TOC or real content
                     if pattern.startswith(r"^\["):  # EPUB link pattern
                         # Check the next few lines to see if they contain real content or just more links
-                        next_lines = lines[i+1:i+10]  # Look at next 10 lines
+                        next_lines = lines[i + 1 : i + 10]  # Look at next 10 lines
                         # Count links vs actual text
-                        link_count = sum(1 for l in next_lines if re.match(r'^\[.*\]\(.*\)', l.strip()))
-                        text_count = sum(1 for l in next_lines if l.strip() and not re.match(r'^\[.*\]\(.*\)', l.strip()))
+                        link_count = sum(
+                            1
+                            for next_line in next_lines
+                            if re.match(r"^\[.*\]\(.*\)", next_line.strip())
+                        )
+                        text_count = sum(
+                            1
+                            for next_line in next_lines
+                            if next_line.strip()
+                            and not re.match(r"^\[.*\]\(.*\)", next_line.strip())
+                        )
 
                         # If mostly links (TOC), skip this entry
                         if link_count > text_count and link_count > 2:
@@ -392,7 +389,9 @@ class HierarchicalContentProcessor:
             if len(section_content) > max_section_size:
                 chunks = text_splitter.split_text(section_content)
                 for j, chunk in enumerate(chunks):
-                    chunk_title = f"{cleaned_title} (Part {j + 1})" if cleaned_title else None
+                    chunk_title = (
+                        f"{cleaned_title} (Part {j + 1})" if cleaned_title else None
+                    )
                     sections.append((chunk, chunk_title))
             else:
                 sections.append((section_content, cleaned_title))

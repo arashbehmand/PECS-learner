@@ -1286,7 +1286,7 @@ Be analytical and honest. Don't be overly enthusiastic or artificially encouragi
                 ui.button(
                     "Regenerate Notes",
                     icon="refresh",
-                    on_click=lambda: self._regenerate_study_notes(),
+                    on_click=self._regenerate_study_notes,
                 ).classes("bg-indigo-500 mt-4")
 
             # Show rolling context info if available
@@ -1301,10 +1301,9 @@ Be analytical and honest. Don't be overly enthusiastic or artificially encouragi
 
     def _regenerate_study_notes(self):
         """Regenerate study notes for the current section"""
-        from utils.llm_service import LLMService
         from utils.rolling_context_service import RollingContextService
 
-        llm_service = LLMService()
+        llm_service = self.llm_service
 
         if not llm_service.is_available():
             ui.notify("AI service unavailable", color="negative", position="top")
@@ -1312,7 +1311,6 @@ Be analytical and honest. Don't be overly enthusiastic or artificially encouragi
 
         async def start_regeneration():
             """Start the regeneration process with async support"""
-            import asyncio
 
             with ui.dialog() as dialog, ui.card().classes("w-full max-w-lg"):
                 ui.label("Regenerate Study Notes").classes("text-xl font-bold mb-4")
@@ -1372,7 +1370,7 @@ Be analytical and honest. Don't be overly enthusiastic or artificially encouragi
                             status_label.text = "Generating rolling context..."
                         elif state["phase"] == "notes":
                             status_label.text = "Generating study notes..."
-                        return  # Keep polling
+                        return True  # Keep polling
 
                     # Done - show result
                     if state["success"]:
@@ -1385,9 +1383,9 @@ Be analytical and honest. Don't be overly enthusiastic or artificially encouragi
                         progress_container.clear()
                         with progress_container:
                             with ui.card().classes("bg-red-50 p-4"):
-                                ui.label(
-                                    state["error"] or "Unknown error"
-                                ).classes("text-red-700")
+                                ui.label(state["error"] or "Unknown error").classes(
+                                    "text-red-700"
+                                )
 
                     return False  # Stop polling
 
