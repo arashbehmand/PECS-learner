@@ -49,5 +49,19 @@ CARDS_PER_STUDY_SESSION = 50
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 AI_ENABLED = bool(OPENAI_API_KEY)
 
+# AI Model Configuration
+# Use gpt-4o-mini for fast/cheap tasks (rolling context, map phase)
+LLM_MODEL_FAST = os.getenv("LLM_MODEL_FAST", "gpt-4o-mini")
+# Use gpt-4o or better for quality tasks (study notes reduce/refine phase)
+LLM_MODEL_QUALITY = os.getenv("LLM_MODEL_QUALITY", "gpt-4o")
+# Default model for general feedback (backward compatibility)
+LLM_MODEL_DEFAULT = os.getenv("LLM_MODEL_DEFAULT", "gpt-4o-mini")
+
+# Rolling Context Configuration
+# Maximum characters for rolling context (safety net, not target)
+ROLLING_CONTEXT_MAX_CHARS = int(os.getenv("ROLLING_CONTEXT_MAX_CHARS", "2000"))
+# Target token count for rolling summaries (~4 chars per token)
+ROLLING_CONTEXT_TARGET_TOKENS = int(os.getenv("ROLLING_CONTEXT_TARGET_TOKENS", "400"))
+
 # Ensure data directory exists
 DATA_DIR.mkdir(exist_ok=True)

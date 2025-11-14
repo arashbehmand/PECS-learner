@@ -8,6 +8,8 @@ import yaml
 from langfuse.openai import OpenAI as LangfuseOpenAI
 from openai import OpenAI
 
+from nicegui_app.config import LLM_MODEL_DEFAULT, LLM_MODEL_FAST, LLM_MODEL_QUALITY
+
 # Setup logging
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,10 @@ class LLMService:
             self.client = None
             logger.warning("No OpenAI API key found. LLM features will be unavailable.")
 
-        self.model = "gpt-3.5-turbo"  # Default to a cost-effective model
+        # Configure models from config (configurable via environment variables)
+        self.model = LLM_MODEL_DEFAULT  # Default model for general tasks
+        self.model_fast = LLM_MODEL_FAST  # Fast model for quick tasks (rolling context)
+        self.model_quality = LLM_MODEL_QUALITY  # Quality model for important tasks (study notes)
 
     def is_available(self) -> bool:
         """Check if LLM service is available (API key configured)."""
@@ -377,4 +382,170 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
 
         except Exception as e:
             logger.error(f"Error generating flashcard suggestions: {str(e)}")
+            return None
+
+    # Rolling Context Methods
+    def generate_rolling_summary(
+        self,
+        previous_summary: str,
+        current_content: str,
+        section_title: str,
+    ) -> Optional[str]:
+        """
+        Generate a rolling summary that integrates current section with previous sections.
+
+        This implements the "rolling window context" from the document summarizer.
+        Uses fast model for efficiency.
+
+        Args:
+            previous_summary: Summary of all previous sections
+            current_content: Content of current section
+            section_title: Title of current section
+
+        Returns:
+            Updated rolling summary, or None if error
+        """
+        prompt = self._get_prompt("rolling_context_module", "generate_summary")
+        if not prompt:
+            return None
+
+        user_prompt = prompt["user"].format(
+            previous_summary=previous_summary or "This is the first section.",
+            current_content=current_content,
+            section_title=section_title,
+        )
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_fast,  # Use fast model for rolling context
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,  # Lower temperature for consistency
+                max_tokens=800,  # Enough for ~300-400 word summary
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error generating rolling summary: {e}", exc_info=True)
+            return None
+
+    # Study Notes Methods
+    def generate_study_notes(
+        self,
+        rolling_summary: str,
+        section_title: str,
+        section_content: str,
+        pecs_summary: str = "",
+    ) -> Optional[str]:
+        """
+        Generate study notes for a section.
+
+        Focuses on: diagrams, connections, definitions, key concepts (not summaries).
+        Uses quality model for better output.
+
+        Args:
+            rolling_summary: Context from previous sections
+            section_title: Title of current section
+            section_content: Content of current section
+            pecs_summary: Optional summary of student's learning journey
+
+        Returns:
+            Generated study notes in markdown format, or None if error
+        """
+        prompt = self._get_prompt("study_notes_module", "generate_section_notes")
+        if not prompt:
+            return None
+
+        user_prompt = prompt["user"].format(
+            rolling_summary=rolling_summary or "This is the first section.",
+            section_title=section_title,
+            section_content=section_content,
+            pecs_summary=pecs_summary or "No student learning data available yet.",
+        )
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_quality,  # Use quality model for study notes
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.5,  # Moderate temperature for creativity
+                max_tokens=2000,  # Allow longer study notes
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error generating study notes: {e}", exc_info=True)
+            return None
+
+    def combine_study_notes(self, all_section_notes: List[str]) -> Optional[str]:
+        """
+        Combine individual section notes into a cohesive study guide.
+
+        This is the "reduce" phase from the document summarizer.
+        Uses quality model for better synthesis.
+
+        Args:
+            all_section_notes: List of study notes from all sections
+
+        Returns:
+            Combined study guide, or None if error
+        """
+        prompt = self._get_prompt("study_notes_module", "combine_section_notes")
+        if not prompt:
+            return None
+
+        # Format all section notes with separators
+        formatted_notes = "\n\n" + "=" * 60 + "\n\n".join(all_section_notes)
+
+        user_prompt = prompt["user"].format(all_section_notes=formatted_notes)
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_quality,  # Use quality model
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.4,  # Lower temperature for consistency
+                max_tokens=4000,  # Allow longer combined notes
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error combining study notes: {e}", exc_info=True)
+            return None
+
+    def refine_study_notes(self, draft_notes: str) -> Optional[str]:
+        """
+        Refine and polish study notes for clarity and effectiveness.
+
+        This is the "consistency" phase from the document summarizer.
+        Uses quality model for final polish.
+
+        Args:
+            draft_notes: Draft study notes to refine
+
+        Returns:
+            Refined study notes, or None if error
+        """
+        prompt = self._get_prompt("study_notes_module", "refine_study_notes")
+        if not prompt:
+            return None
+
+        user_prompt = prompt["user"].format(draft_notes=draft_notes)
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_quality,  # Use quality model
+                messages=[
+                    {"role": "system", "content": prompt["system"]},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,  # Lower temperature for consistency
+                max_tokens=4000,  # Allow full refined notes
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"Error refining study notes: {e}", exc_info=True)
             return None

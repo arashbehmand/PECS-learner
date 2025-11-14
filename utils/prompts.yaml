@@ -117,36 +117,126 @@ solidify_module:
     system: "You are a helpful learning assistant analyzing a student's flashcards for a text section."
     user: |
       Review the student's flashcards for the following text section.
-      
+
       Original Text:
       {chunk_text}
-      
+
       Student's Flashcards:
       {student_flashcards}
-      
+
       Provide feedback on:
       1. Quality of questions
       2. Completeness of answers
       3. Coverage of key concepts
       4. Suggestions for additional cards
-      
+
       Keep your response encouraging and constructive.
 
   application_analysis:
     system: "You are a helpful learning assistant analyzing a student's application of concepts."
     user: |
       Review the student's application of concepts from the following text section.
-      
+
       Original Text:
       {chunk_text}
-      
+
       Student's Application:
       {student_application}
-      
+
       Provide feedback on:
       1. Practicality of applications
       2. Depth of understanding shown
       3. Additional applications to consider
       4. How these applications reinforce learning
-      
-      Keep your response encouraging and constructive. 
+
+      Keep your response encouraging and constructive.
+
+rolling_context_module:
+  generate_summary:
+    system: "You are an expert at creating concise, informative summaries that capture the essence of learning material."
+    user: |
+      Create a concise rolling summary for the current section.
+
+      Previous Sections Summary:
+      {previous_summary}
+
+      Current Section Content:
+      {current_content}
+
+      Current Section Title: {section_title}
+
+      Instructions:
+      1. Integrate the current section's key concepts with the previous summary
+      2. Focus on: main ideas, key definitions, important relationships
+      3. Be concise - aim for 300-400 words maximum
+      4. Maintain narrative flow from previous sections
+      5. Highlight connections between current and previous sections
+      6. This summary will be used as context for subsequent sections
+
+      Output only the updated rolling summary text, no additional commentary.
+
+study_notes_module:
+  generate_section_notes:
+    system: "You are an expert at creating study notes like a student would: focusing on diagrams, connections, definitions, and key concepts rather than summaries."
+    user: |
+      Create study notes for this section in the style a student would write when truly understanding the material (Feynman method).
+
+      Previous Sections Context:
+      {rolling_summary}
+
+      Current Section:
+      Title: {section_title}
+      Content: {section_content}
+
+      Student's Learning Journey (if available):
+      {pecs_summary}
+
+      Instructions:
+      1. Focus on KEY CONCEPTS and their definitions
+      2. Create CONNECTIONS between concepts (use arrows, relationships)
+      3. Include concept maps or diagrams where helpful (ASCII art or markdown)
+      4. Highlight CRITICAL RELATIONSHIPS and patterns
+      5. Add necessary DEFINITIONS in clear terms
+      6. Show how concepts from previous sections connect to current material
+      7. This is NOT a summary - it's study notes for active learning
+      8. Use markdown formatting: headings, lists, emphasis, diagrams
+
+      Generate study notes that help understand and remember the material deeply.
+
+  combine_section_notes:
+    system: "You are an expert at synthesizing study notes into coherent study guides."
+    user: |
+      Combine these individual section notes into a cohesive study guide for the entire material.
+
+      Section Notes:
+      {all_section_notes}
+
+      Instructions:
+      1. Group related concepts across sections
+      2. Create a logical flow and hierarchy
+      3. Preserve all concept maps and diagrams
+      4. Eliminate redundancy while keeping all unique insights
+      5. Show progression and connections across sections
+      6. Maintain student-friendly language and formatting
+      7. Use clear markdown structure
+
+      Output a well-organized, comprehensive study guide.
+
+  refine_study_notes:
+    system: "You are an expert at refining educational materials for clarity and effectiveness."
+    user: |
+      Refine these study notes for maximum clarity and learning effectiveness.
+
+      Draft Study Notes:
+      {draft_notes}
+
+      Instructions:
+      1. Ensure logical flow and clear structure
+      2. Check that all concepts are properly defined
+      3. Verify connections and relationships are clear
+      4. Improve any unclear diagrams or explanations
+      5. Ensure proper markdown formatting
+      6. Maintain focus on understanding over memorization
+      7. Keep the student-friendly, active learning style
+
+      Output the refined study notes in markdown format, ready for learning. 
