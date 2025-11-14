@@ -44,18 +44,21 @@ class LLMService:
         # Initialize client if we have an API key
         if self.api_key:
             # Use Langfuse for observability if configured, otherwise standard OpenAI client
+            # Langfuse SDK reads LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and LANGFUSE_HOST
+            # from environment variables automatically
             langfuse_public_key = os.getenv("LANGFUSE_PUBLIC_KEY")
             langfuse_secret_key = os.getenv("LANGFUSE_SECRET_KEY")
-            langfuse_host = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
 
             if langfuse_public_key and langfuse_secret_key:
-                self.client = LangfuseOpenAI(
-                    api_key=self.api_key,
-                    langfuse_public_key=langfuse_public_key,
-                    langfuse_secret_key=langfuse_secret_key,
-                    langfuse_host=langfuse_host,
-                )
-                logger.info("LLM service initialized with Langfuse observability")
+                try:
+                    self.client = LangfuseOpenAI(api_key=self.api_key)
+                    logger.info("LLM service initialized with Langfuse observability")
+                except TypeError as e:
+                    logger.warning(
+                        "Langfuse client init failed (%s). Falling back to standard OpenAI client.",
+                        e,
+                    )
+                    self.client = OpenAI(api_key=self.api_key)
             else:
                 self.client = OpenAI(api_key=self.api_key)
                 logger.info(
@@ -97,8 +100,6 @@ class LLMService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.7,
-                max_tokens=500,
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -268,8 +269,6 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.7,
-                max_tokens=1000,
             )
 
             content = response.choices[0].message.content
@@ -357,8 +356,6 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
                     },
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.7,
-                max_tokens=1000,
             )
 
             content = response.choices[0].message.content
@@ -407,6 +404,7 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
         """
         prompt = self._get_prompt("rolling_context_module", "generate_summary")
         if not prompt:
+            logger.error("Rolling summary prompt not found")
             return None
 
         user_prompt = prompt["user"].format(
@@ -422,8 +420,6 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
                     {"role": "system", "content": prompt["system"]},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.3,  # Lower temperature for consistency
-                max_tokens=800,  # Enough for ~300-400 word summary
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -471,8 +467,6 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
                     {"role": "system", "content": prompt["system"]},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.5,  # Moderate temperature for creativity
-                max_tokens=2000,  # Allow longer study notes
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -508,8 +502,6 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
                     {"role": "system", "content": prompt["system"]},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.4,  # Lower temperature for consistency
-                max_tokens=4000,  # Allow longer combined notes
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -542,8 +534,6 @@ Example: [{{"question": "...", "answer": "..."}}, {{"question": "...", "answer":
                     {"role": "system", "content": prompt["system"]},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.3,  # Lower temperature for consistency
-                max_tokens=4000,  # Allow full refined notes
             )
             return response.choices[0].message.content
         except Exception as e:

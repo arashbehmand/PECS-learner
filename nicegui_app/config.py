@@ -51,15 +51,15 @@ AI_ENABLED = bool(OPENAI_API_KEY)
 
 # AI Model Configuration
 # Use gpt-4o-mini for fast/cheap tasks (rolling context, map phase)
-LLM_MODEL_FAST = os.getenv("LLM_MODEL_FAST", "gpt-4o-mini")
+LLM_MODEL_FAST = os.getenv("LLM_MODEL_FAST", "gpt-5-mini")
 # Use gpt-4o or better for quality tasks (study notes reduce/refine phase)
-LLM_MODEL_QUALITY = os.getenv("LLM_MODEL_QUALITY", "gpt-4o")
+LLM_MODEL_QUALITY = os.getenv("LLM_MODEL_QUALITY", "gpt-5.1")
 # Default model for general feedback (backward compatibility)
-LLM_MODEL_DEFAULT = os.getenv("LLM_MODEL_DEFAULT", "gpt-4o-mini")
+LLM_MODEL_DEFAULT = os.getenv("LLM_MODEL_DEFAULT", "gpt-5-mini")
 
 # Rolling Context Configuration
 # Maximum characters for rolling context (safety net, not target)
-ROLLING_CONTEXT_MAX_CHARS = int(os.getenv("ROLLING_CONTEXT_MAX_CHARS", "2000"))
+ROLLING_CONTEXT_MAX_CHARS = int(os.getenv("ROLLING_CONTEXT_MAX_CHARS", "10000"))
 # Target token count for rolling summaries (~4 chars per token)
 ROLLING_CONTEXT_TARGET_TOKENS = int(os.getenv("ROLLING_CONTEXT_TARGET_TOKENS", "400"))
 
