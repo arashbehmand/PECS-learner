@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: pecs-learner
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python nicegui_app/main.py"
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: PORT
+        value: "8080"
+      - key: NICEGUI_STORAGE_PATH
+        value: "/var/data/nicegui_storage"
+      - fromGroup: pecs-env
+    disk:
+      name: pecs-data
+      mountPath: /app/data
+      sizeGB: 1

@@ -5,9 +5,9 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
     curl \
+    g++ \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -30,5 +30,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/ || exit 1
 
 # Run NiceGUI application
-CMD ["python", "nicegui_app/main.py"]
+CMD ["python", "-m", "nicegui_app.main"]
 

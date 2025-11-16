@@ -30,7 +30,7 @@
 
 ```bash
 # Clone and run with Docker
-git clone https://github.com/yourusername/PECS-learner.git
+git clone https://github.com/arashbehmand/PECS-learner.git
 cd PECS-learner
 
 # Start the app (includes database, AI, PWA—everything!)
@@ -127,13 +127,24 @@ Each phase unlocks sequentially, guiding you through a proven learning process.
 
 ## 🛠️ Installation & Setup
 
-### Option 1: Docker (Recommended for Production)
+### Option 1: One-Click Deployment (Recommended)
+
+Deploy your own instance of P.E.C.S. in minutes with one of these free services:
+
+| Service | Button | Notes |
+| --- | --- | --- |
+| **Render** | [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/arashbehmand/PECS-learner) | **Free tier**: Spins down after 15 mins of inactivity. Includes a 1GB persistent disk for your database. |
+| **Railway** | [![Deploy to Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/arashbehmand/PECS-learner&envs=OPENAI_API_KEY,ANTHROPIC_API_KEY,GEMINI_API_KEY&NICEGUI_STORAGE_PATH=/app/data/nicegui_storage&PORT=8080) | **Free tier**: Provides $5 of monthly credits (approx. 500 hours). Requires a verified account. |
+
+**Important:** After deploying, you must configure your LLM provider's API key in the environment variables of the service to enable AI features.
+
+### Option 2: Docker (Local & Self-Hosted)
 
 **Prerequisites**: Docker and Docker Compose installed
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/PECS-learner.git
+git clone https://github.com/arashbehmand/PECS-learner.git
 cd PECS-learner
 
 # (Optional) Configure environment
@@ -152,11 +163,13 @@ docker-compose down
 
 **Access**: http://localhost:8080
 
-### Option 2: Local Development
+For production self-hosting, see the [Docker Deployment Guide](#-docker-deployment).
+
+### Option 3: Local Development (Virtual Environment)
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/PECS-learner.git
+git clone https://github.com/arashbehmand/PECS-learner.git
 cd PECS-learner
 
 # Create virtual environment
@@ -581,8 +594,8 @@ Built with excellent open-source tools:
 
 ## 📧 Support & Contact
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/PECS-learner/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/PECS-learner/discussions)
+- **Issues**: [GitHub Issues](https://github.com/arashbehmand/PECS-learner/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/arashbehmand/PECS-learner/discussions)
 - **Email**: your.email@example.com
 
 ---
@@ -591,6 +604,6 @@ Built with excellent open-source tools:
 
 **Made with ❤️ for deep, structured learning**
 
-[⭐ Star this repo](https://github.com/yourusername/PECS-learner) if you find it useful!
+[⭐ Star this repo](https://github.com/arashbehmand/PECS-learner) if you find it useful!
 
 </div>
