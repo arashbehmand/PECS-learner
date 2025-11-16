@@ -54,7 +54,7 @@ AI_ENABLED = bool(OPENAI_API_KEY)
 LLM_MODEL_FAST = os.getenv("LLM_MODEL_FAST", "gpt-5-mini")
 # Use gpt-4o or better for quality tasks (study notes reduce/refine phase)
 LLM_MODEL_QUALITY = os.getenv("LLM_MODEL_QUALITY", "gpt-5.1")
-# Default model for general feedback (backward compatibility)
+# Default model for general feedback
 LLM_MODEL_DEFAULT = os.getenv("LLM_MODEL_DEFAULT", "gpt-5-mini")
 
 # Rolling Context Configuration

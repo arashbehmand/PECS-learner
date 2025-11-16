@@ -388,8 +388,8 @@ def _format_context_for_flashcards(context):
 - Comprehensive error handling
 
 **Key Methods**:
-- `suggest_flashcards_with_context(formatted_context)` - NEW preferred method
-- `suggest_flashcards(...)` - Legacy method (still supported)
+- `suggest_flashcards_with_context(formatted_context)` - Context-based method
+- `suggest_flashcards(...)` - Direct-from-material method
 - `analyze_section_understanding(...)`
 - `analyze_explanation(...)`
 - `analyze_critical_thinking(...)`
@@ -661,7 +661,7 @@ See `TESTING.md` for comprehensive documentation.
 - Limited markdown rendering in content areas
 
 ### Pre-Alpha Status
-- No backward compatibility guarantees
+- No long-term compatibility guarantees
 - Database schema may change
 - Breaking changes possible
 

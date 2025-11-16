@@ -246,7 +246,6 @@ class LLMService:
         )
         return self._make_llm_call(prompt["system"], user_prompt)
 
-    # Original methods (kept for backward compatibility)
     def get_simplicity_feedback(self, explanation: str) -> Optional[str]:
         """Get feedback on explanation simplicity and clarity."""
         return self.analyze_explanation("", explanation)  # Reuse explanation analysis
@@ -254,11 +253,10 @@ class LLMService:
     def suggest_flashcards_with_context(
         self, formatted_context: str
     ) -> Optional[List[Dict[str, str]]]:
-        """
-        Suggest flashcard Q/A pairs based on formatted learning context.
+        """Suggest flashcard Q/A pairs based on formatted learning context.
 
-        This is the NEW preferred method that uses pre-formatted context from
-        _build_learning_context() and _format_context_for_flashcards().
+        Uses pre-formatted context from build_learning_context() and
+        format_context_for_flashcards().
 
         Args:
             formatted_context: Pre-formatted string with all learning context

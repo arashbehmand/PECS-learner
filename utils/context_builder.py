@@ -58,7 +58,6 @@ def build_learning_context(
 
     # Extract Challenge phase data
     challenge_data = pecs_data.get("challenge_connect", {})
-    # Try both field names for backward compatibility
     context["critical_thinking"] = challenge_data.get(
         "critical_questions"
     ) or challenge_data.get("critical_thinking")

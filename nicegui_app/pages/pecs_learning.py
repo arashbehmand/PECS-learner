@@ -1003,18 +1003,6 @@ class PECSLearningPage:
 
         dialog.open()
 
-    def _add_ai_flashcard(self, suggestion: dict, dialog):
-        """Add AI-suggested flashcard (legacy method - no longer used)"""
-        self.db.create_flashcard(
-            project_id=self.section.project_id,
-            question=suggestion["question"],
-            answer=suggestion["answer"],
-            section_id=self.section_id,
-        )
-        ui.notify("Flashcard added!", color="positive", position="top")
-        dialog.close()
-        ui.navigate.reload()
-
     def _delete_flashcard(self, flashcard_id: int):
         """Delete a flashcard"""
         self.db.delete_flashcard(flashcard_id)

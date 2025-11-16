@@ -251,11 +251,8 @@ def test_suggest_flashcards_with_context_empty_response(mock_llm_service):
     assert result == []  # Empty list is valid
 
 
-# ===== LEGACY METHOD TESTS =====
-
-
-def test_suggest_flashcards_legacy_method(mock_llm_service):
-    """Test the legacy suggest_flashcards method still works."""
+def test_suggest_flashcards_method(mock_llm_service):
+    """Test that suggest_flashcards method still works."""
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
     mock_response.choices[0].message.content = json.dumps(

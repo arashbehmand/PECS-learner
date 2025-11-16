@@ -321,7 +321,7 @@ PECS-learner/
 │   ├── hierarchical_processor.py # Auto-detect document structure
 │   ├── file_converters.py       # EPUB, PDF, DOCX → text
 │   ├── prompts.yaml             # AI prompt templates
-│   └── migration.py             # JSON legacy import
+│   └── migration.py             # JSON import utility (optional)
 ├── tests/                        # Comprehensive test suite (56 tests)
 │   ├── test_context_builder.py # 100% coverage
 │   ├── test_database.py
