@@ -4,7 +4,8 @@ Tests for voice service (speech-to-text and text-to-speech).
 
 import os
 import tempfile
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
 
 from utils.voice_service import VoiceService, get_voice_service
@@ -24,9 +25,7 @@ class TestVoiceService:
     def test_initialization_custom_values(self):
         """Test VoiceService initializes with custom values."""
         service = VoiceService(
-            tts_voice="alloy",
-            tts_model="tts-1-hd",
-            whisper_model="whisper-1"
+            tts_voice="alloy", tts_model="tts-1-hd", whisper_model="whisper-1"
         )
 
         assert service.tts_voice == "alloy"
@@ -87,14 +86,15 @@ class TestVoiceService:
 
             service = VoiceService()
             result = service.transcribe_audio(
-                tmp_path,
-                prompt="Technical lecture about machine learning"
+                tmp_path, prompt="Technical lecture about machine learning"
             )
 
             assert result == "Transcribed text"
 
             call_args = mock_transcription.call_args
-            assert call_args.kwargs["prompt"] == "Technical lecture about machine learning"
+            assert (
+                call_args.kwargs["prompt"] == "Technical lecture about machine learning"
+            )
 
         finally:
             os.unlink(tmp_path)
@@ -157,9 +157,7 @@ class TestVoiceService:
 
         # Verify API call
         mock_client.audio.speech.create.assert_called_once_with(
-            model="tts-1",
-            voice="nova",
-            input="Hello, world!"
+            model="tts-1", voice="nova", input="Hello, world!"
         )
 
         # Verify file was written
@@ -217,7 +215,7 @@ class TestVoiceService:
             result = service.transcribe_with_context(
                 tmp_path,
                 section_content="This is a lecture about neural networks and deep learning.",
-                phase="engage"
+                phase="engage",
             )
 
             assert result == "Transcribed with context"
@@ -243,10 +241,7 @@ class TestVoiceService:
             mock_transcription.return_value = mock_response
 
             service = VoiceService()
-            result = service.transcribe_with_context(
-                tmp_path,
-                phase="prime"
-            )
+            result = service.transcribe_with_context(tmp_path, phase="prime")
 
             assert result == "Prime phase transcription"
 

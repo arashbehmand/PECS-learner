@@ -10,17 +10,23 @@ This module provides:
 import logging
 import os
 import tempfile
-from pathlib import Path
-from typing import Optional, Literal
+from typing import Literal, Optional
 
-from litellm import transcription, completion
-import litellm
+from litellm import transcription
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
+
+class VoiceServiceError(Exception):
+    """Exception raised for errors in the voice service operations."""
+
+    # No implementation needed - just inherit from Exception
+
+
 # Voice configuration
-TTS_VOICE_OPTIONS = Literal["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
-TTS_MODEL_OPTIONS = Literal["tts-1", "tts-1-hd"]
+TtsVoiceOptions = Literal["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+TtsModelOptions = Literal["tts-1", "tts-1-hd"]
 
 
 class VoiceService:
@@ -29,8 +35,8 @@ class VoiceService:
     def __init__(
         self,
         *,
-        tts_voice: TTS_VOICE_OPTIONS = "nova",
-        tts_model: TTS_MODEL_OPTIONS = "tts-1",
+        tts_voice: TtsVoiceOptions = "nova",
+        tts_model: TtsModelOptions = "tts-1",
         whisper_model: str = "whisper-1",
     ):
         """Initialize voice service.
@@ -69,7 +75,7 @@ class VoiceService:
             Transcribed text
 
         Raises:
-            Exception: If transcription fails
+            VoiceServiceError: If transcription fails
         """
         try:
             logger.info(f"Transcribing audio file: {audio_file_path}")
@@ -99,7 +105,7 @@ class VoiceService:
 
         except Exception as e:
             logger.error(f"Transcription failed: {e}", exc_info=True)
-            raise Exception(f"Failed to transcribe audio: {str(e)}")
+            raise VoiceServiceError(f"Failed to transcribe audio: {str(e)}")
 
     def text_to_speech(
         self,
@@ -116,23 +122,21 @@ class VoiceService:
             Path to generated audio file (MP3 format)
 
         Raises:
-            Exception: If TTS generation fails
+            VoiceServiceError: If TTS generation fails
         """
         try:
             logger.info(f"Generating speech for text ({len(text)} characters)")
 
             # Create output path if not provided
             if output_path is None:
-                temp_file = tempfile.NamedTemporaryFile(
+                # Fixed: Use context manager for resource allocation (pylint W1732)
+                with tempfile.NamedTemporaryFile(
                     delete=False, suffix=".mp3", prefix="tts_"
-                )
-                output_path = temp_file.name
-                temp_file.close()
+                ) as temp_file:
+                    output_path = temp_file.name
 
             # Use OpenAI's TTS via litellm
             # Note: litellm doesn't have direct TTS support, so we use openai directly
-            from openai import OpenAI
-
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
             response = client.audio.speech.create(
@@ -149,7 +153,7 @@ class VoiceService:
 
         except Exception as e:
             logger.error(f"TTS generation failed: {e}", exc_info=True)
-            raise Exception(f"Failed to generate speech: {str(e)}")
+            raise VoiceServiceError(f"Failed to generate speech: {str(e)}")
 
     def transcribe_with_context(
         self,
@@ -218,17 +222,17 @@ class VoiceService:
         return bool(os.getenv("OPENAI_API_KEY"))
 
 
-# Global singleton instance
-_voice_service_instance: Optional[VoiceService] = None
+# Global singleton instance - replaced with function attribute to avoid global statement (pylint W0603)
+# _voice_service_instance: Optional[VoiceService] = None
 
 
 def get_voice_service() -> VoiceService:
-    """Get or create the global VoiceService instance.
+    """Get or create the VoiceService singleton instance.
 
     Returns:
         VoiceService singleton instance
     """
-    global _voice_service_instance
-    if _voice_service_instance is None:
-        _voice_service_instance = VoiceService()
-    return _voice_service_instance
+    # Use public function attribute instead of global to avoid pylint W0603
+    if not hasattr(get_voice_service, "instance"):
+        get_voice_service.instance = VoiceService()
+    return get_voice_service.instance

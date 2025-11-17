@@ -10,12 +10,11 @@ Provides:
 
 import asyncio
 import logging
-from typing import Optional, Callable
-
-from nicegui import ui, app
-from fastapi import UploadFile
-import tempfile
 import os
+import tempfile
+from typing import Callable, Optional
+
+from nicegui import ui
 
 logger = logging.getLogger(__name__)
 
@@ -88,15 +87,13 @@ class VoiceInputButton:
 
             # Control buttons
             with ui.row().classes("gap-2"):
-                stop_button = ui.button(
+                ui.button(
                     "Stop Recording",
                     on_click=lambda: dialog.submit("stop"),
-                    color="red"
+                    color="red",
                 )
-                cancel_button = ui.button(
-                    "Cancel",
-                    on_click=lambda: dialog.submit("cancel"),
-                    color="gray"
+                ui.button(
+                    "Cancel", on_click=lambda: dialog.submit("cancel"), color="gray"
                 )
 
         # Open dialog
@@ -140,14 +137,18 @@ class VoiceInputButton:
 
         if not recording_started:
             dialog.close()
-            ui.notify("Microphone access denied. Please allow microphone access.", type="negative")
+            ui.notify(
+                "Microphone access denied. Please allow microphone access.",
+                type="negative",
+            )
             return
 
         # Update timer
         async def update_timer():
-            start_time = 0
             while dialog.value is None:
-                elapsed = await ui.run_javascript("window.activeRecorder ? Math.floor((Date.now() - window.activeRecorder.startTime) / 1000) : 0")
+                elapsed = await ui.run_javascript(
+                    "window.activeRecorder ? Math.floor((Date.now() - window.activeRecorder.startTime) / 1000) : 0"
+                )
                 minutes = int(elapsed) // 60
                 seconds = int(elapsed) % 60
                 timer_label.set_text(f"{minutes}:{seconds:02d}")
@@ -218,10 +219,11 @@ class VoiceInputButton:
             )
 
             if not audio_blob_b64:
-                raise Exception("Failed to capture audio")
+                raise RuntimeError("Failed to capture audio")
 
             # Send to backend for transcription
             import base64
+
             audio_data = base64.b64decode(audio_blob_b64)
 
             # Save to temp file
@@ -292,31 +294,26 @@ class VoiceInputButton:
         # Create recognition dialog
         with ui.dialog() as dialog, ui.card().classes("p-6"):
             ui.label("🎤 Listening...").classes("text-xl font-bold mb-4")
-            ui.label("Start speaking. Pauses are automatically detected.").classes("mb-4")
+            ui.label("Start speaking. Pauses are automatically detected.").classes(
+                "mb-4"
+            )
 
             # Live transcript display
-            transcript_area = ui.textarea(
-                label="Live Transcription",
-                value=""
-            ).classes("w-full").props("readonly rows=6")
+            ui.textarea(label="Live Transcription", value="").classes("w-full").props(
+                "readonly rows=6"
+            )
 
             with ui.row().classes("gap-2 mt-4"):
+                ui.button("Done", on_click=lambda: dialog.submit("done"), color="green")
                 ui.button(
-                    "Done",
-                    on_click=lambda: dialog.submit("done"),
-                    color="green"
-                )
-                ui.button(
-                    "Cancel",
-                    on_click=lambda: dialog.submit("cancel"),
-                    color="gray"
+                    "Cancel", on_click=lambda: dialog.submit("cancel"), color="gray"
                 )
 
         dialog.open()
 
         # Start recognition
         await ui.run_javascript(
-            f"""
+            """
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             const recognition = new SpeechRecognition();
 
@@ -326,17 +323,17 @@ class VoiceInputButton:
 
             let finalTranscript = '';
 
-            recognition.onresult = (event) => {{
+            recognition.onresult = (event) => {
                 let interimTranscript = '';
 
-                for (let i = event.resultIndex; i < event.results.length; i++) {{
+                for (let i = event.resultIndex; i < event.results.length; i++) {
                     const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {{
+                    if (event.results[i].isFinal) {
                         finalTranscript += transcript + ' ';
-                    }} else {{
+                    } else {
                         interimTranscript += transcript;
-                    }}
-                }}
+                    }
+                }
 
                 // Update the transcript area
                 const fullText = finalTranscript + interimTranscript;
@@ -345,18 +342,18 @@ class VoiceInputButton:
 
                 // Store final transcript
                 window.realtimeTranscript = finalTranscript;
-            }};
+            };
 
-            recognition.onerror = (event) => {{
+            recognition.onerror = (event) => {
                 console.error('Recognition error:', event.error);
-            }};
+            };
 
-            recognition.onend = () => {{
+            recognition.onend = () => {
                 // Auto-restart unless stopped
-                if (window.realtimeRecognitionActive) {{
+                if (window.realtimeRecognitionActive) {
                     recognition.start();
-                }}
-            }};
+                }
+            };
 
             window.realtimeRecognitionActive = true;
             window.activeRecognition = recognition;
@@ -382,9 +379,7 @@ class VoiceInputButton:
             return
 
         # Get final transcript
-        final_text = await ui.run_javascript(
-            "window.realtimeTranscript || ''"
-        )
+        final_text = await ui.run_javascript("window.realtimeTranscript || ''")
 
         if final_text:
             # Insert into textarea

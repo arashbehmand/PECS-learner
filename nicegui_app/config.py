@@ -65,8 +65,12 @@ ROLLING_CONTEXT_TARGET_TOKENS = int(os.getenv("ROLLING_CONTEXT_TARGET_TOKENS", "
 
 # Voice Input & TTS Configuration
 VOICE_ENABLED = bool(os.getenv("OPENAI_API_KEY"))
-TTS_VOICE = os.getenv("TTS_VOICE", "nova")  # Options: alloy, echo, fable, onyx, nova, shimmer
-TTS_MODEL = os.getenv("TTS_MODEL", "tts-1")  # Options: tts-1 (faster), tts-1-hd (higher quality)
+TTS_VOICE = os.getenv(
+    "TTS_VOICE", "nova"
+)  # Options: alloy, echo, fable, onyx, nova, shimmer
+TTS_MODEL = os.getenv(
+    "TTS_MODEL", "tts-1"
+)  # Options: tts-1 (faster), tts-1-hd (higher quality)
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "whisper-1")
 
 # Ensure data directory exists
