@@ -44,10 +44,12 @@ P.E.C.S. (Prime → Engage → Challenge → Solidify) is an AI-powered learning
 2. **Hierarchical content processing** (auto-detects chapters/sections)
 3. **Guided 4-phase learning workflow** (Prime → Engage → Challenge → Solidify)
 4. **AI-powered feedback and flashcard generation**
-5. **Rolling context** for book-length materials
-6. **SM-2 spaced repetition** algorithm
-7. **Anki export** (API and file-based)
-8. **PWA support** (installable, offline-capable)
+5. **Voice input** (speech-to-text via Whisper API + Web Speech API)
+6. **Text-to-speech** (hear AI feedback read aloud with natural voices)
+7. **Rolling context** for book-length materials
+8. **SM-2 spaced repetition** algorithm
+9. **Anki export** (API and file-based)
+10. **PWA support** (installable, offline-capable)
 
 ---
 
@@ -80,6 +82,7 @@ PECS-learner/
 │   ├── hierarchical_processor.py   # Document structure detection
 │   ├── file_converters.py    # EPUB, PDF, DOCX → text
 │   ├── anki_export.py        # Anki export (API + file)
+│   ├── voice_service.py      # Voice input & TTS ⭐
 │   ├── content_processor.py  # Legacy content processing
 │   └── prompts.yaml          # AI prompt templates
 │
@@ -966,6 +969,191 @@ print(result)
 - [ ] No breaking changes (or documented migration)
 - [ ] Works with Docker deployment
 - [ ] PWA still functions (if UI changes)
+
+---
+
+## Voice Input & Text-to-Speech
+
+### Overview
+
+Voice features enable users to speak their thoughts (speech-to-text) and hear AI feedback aloud (text-to-speech). This is crucial for learning - speaking is often more natural than writing.
+
+### Key Components
+
+**1. Voice Service (`utils/voice_service.py`)**
+
+Core service handling both STT and TTS:
+
+```python
+from utils.voice_service import get_voice_service
+
+voice_service = get_voice_service()
+
+# Check availability
+if voice_service.is_available():
+    # Transcribe audio
+    transcript = voice_service.transcribe_audio("/path/to/audio.webm")
+
+    # Contextual transcription (better accuracy)
+    transcript = voice_service.transcribe_with_context(
+        "/path/to/audio.webm",
+        section_content="Learning material",
+        phase="engage"
+    )
+
+    # Generate speech
+    audio_path = voice_service.text_to_speech("Hello, world!")
+
+    # Cleanup
+    voice_service.cleanup_temp_file(audio_path)
+```
+
+**2. Voice Input Component (`nicegui_app/components/voice_input.py`)**
+
+Reusable UI component for adding voice input to textareas:
+
+```python
+from nicegui import ui
+from nicegui_app.components.voice_input import add_voice_input_buttons
+
+textarea = ui.textarea(label="Your response")
+
+# Add both high-quality and real-time voice buttons
+add_voice_input_buttons(
+    textarea,
+    section_content=section.content,  # Optional context
+    phase="engage",  # Optional phase
+    on_transcribe=lambda text: save_to_db(text)  # Optional callback
+)
+```
+
+**3. Integration in PECS Learning (`nicegui_app/pages/pecs_learning.py`)**
+
+Voice input buttons appear automatically in all learning phases. TTS "Read Aloud" buttons appear on all AI feedback.
+
+### Two Voice Input Modes
+
+**Mode 1: High-Quality Recording (Whisper API)**
+- Professional transcription (90%+ accuracy)
+- Works in all browsers
+- Context-aware (uses section content)
+- Cost: $0.006/minute
+
+**Mode 2: Real-Time (Web Speech API)**
+- Instant transcription
+- FREE (no API costs)
+- Chrome/Safari only
+- Great for quick notes
+
+### Text-to-Speech
+
+- Click "🔊 Read Aloud" on any AI response
+- Natural voices (6 options: alloy, echo, fable, onyx, nova, shimmer)
+- Cost: $15 per 1M characters
+- High-quality MP3 audio
+
+### Configuration
+
+Add to `.env`:
+
+```bash
+# Required for voice features
+OPENAI_API_KEY=sk-...
+
+# Optional customization
+TTS_VOICE=nova  # alloy, echo, fable, onyx, nova, shimmer
+TTS_MODEL=tts-1  # tts-1 or tts-1-hd
+WHISPER_MODEL=whisper-1
+```
+
+### Testing
+
+```bash
+pytest tests/test_voice_service.py -v
+```
+
+Tests cover:
+- Transcription success/failure
+- TTS generation
+- Context-aware transcription
+- Error handling
+- Temp file cleanup
+
+### Cost Estimates
+
+**Individual User (~10 recordings/week, 3 min each):**
+- Voice input: ~$1.80/month
+- TTS (10 reads/week): ~$1.80/month
+- **Total: ~$3-5/month**
+
+**100 Active Users:**
+- Voice input: ~$18/month
+- TTS: ~$45/month
+- **Total: ~$63/month**
+
+### Important Notes
+
+- **Context-aware transcription**: Voice service uses section content and phase to build prompts, improving accuracy for technical terms
+- **Auto-save**: Transcriptions automatically save to database after completion
+- **Privacy**: Audio sent to OpenAI for processing, immediately deleted. No permanent storage.
+- **Browser compat**: Whisper works everywhere. Web Speech API works in Chrome/Safari only.
+
+### Common Tasks
+
+**Adding voice input to a new textarea:**
+
+```python
+# 1. Import
+from nicegui_app.components.voice_input import add_voice_input_buttons
+
+# 2. Create textarea
+textarea = ui.textarea(label="Input")
+
+# 3. Add voice buttons
+add_voice_input_buttons(textarea)
+```
+
+**Adding TTS to AI responses:**
+
+```python
+# Use the _render_tts_button helper from pecs_learning.py
+def _render_tts_button(self, text: str, unique_id: str):
+    """Render text-to-speech button for reading text aloud"""
+    # See pecs_learning.py:325-379 for implementation
+```
+
+**Customizing voice settings:**
+
+```python
+from utils.voice_service import VoiceService
+
+service = VoiceService(
+    tts_voice="alloy",  # Choose voice
+    tts_model="tts-1-hd",  # Higher quality
+)
+```
+
+### Troubleshooting
+
+**"Voice features require OpenAI API key"**
+- Add `OPENAI_API_KEY` to `.env`
+- Restart application
+
+**Transcription fails**
+- Check audio file format (webm, mp3, wav supported)
+- Verify API key has credits
+- Check file size (<25MB)
+
+**TTS not playing**
+- Check browser audio permissions
+- Verify API key
+- Check browser console for errors
+
+### Documentation
+
+- **User guide**: `VOICE_FEATURES.md` - Complete user documentation
+- **Code examples**: `tests/test_voice_service.py`
+- **Integration**: `nicegui_app/components/voice_input.py`
 
 ---
 

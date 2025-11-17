@@ -12,6 +12,7 @@ from nicegui import ui
 
 from utils.database import DatabaseRepository
 from utils.llm_service import LLMService
+from nicegui_app.components.voice_input import add_voice_input_buttons
 
 
 class PECSLearningPage:
@@ -279,29 +280,35 @@ class PECSLearningPage:
         if is_completed:
             # Completed phase - simple display
             ui.label("AI Conversation:").classes("font-semibold mt-3")
-            for msg in ai_conversation:
+            for idx, msg in enumerate(ai_conversation):
                 if msg["role"] == "user":
                     ui.label(f"You: {msg['content']}").classes(
                         "text-sm p-2 bg-blue-50 rounded mb-1"
                     )
                 else:
-                    ui.markdown(f"**AI:** {msg['content']}").classes(
-                        "text-sm p-2 bg-purple-50 rounded mb-1"
-                    )
+                    with ui.column().classes("w-full gap-1 mb-1"):
+                        ui.markdown(f"**AI:** {msg['content']}").classes(
+                            "text-sm p-2 bg-purple-50 rounded"
+                        )
+                        # Add "Read Aloud" button
+                        self._render_tts_button(msg['content'], f"completed_{idx}")
         else:
             # Active phase - interactive display with continue button
             with ui.card().classes("w-full mt-4 bg-purple-50"):
                 ui.label("AI Conversation").classes("font-semibold mb-2")
                 with ui.column().classes("w-full gap-1 max-h-64 overflow-auto"):
-                    for msg in ai_conversation:
+                    for idx, msg in enumerate(ai_conversation):
                         if msg["role"] == "user":
                             ui.label(f"You: {msg['content']}").classes(
                                 "text-sm p-2 bg-blue-100 rounded"
                             )
                         else:
-                            ui.markdown(f"**AI:** {msg['content']}").classes(
-                                "text-sm p-2 bg-white rounded"
-                            )
+                            with ui.column().classes("w-full gap-1"):
+                                ui.markdown(f"**AI:** {msg['content']}").classes(
+                                    "text-sm p-2 bg-white rounded"
+                                )
+                                # Add "Read Aloud" button
+                                self._render_tts_button(msg['content'], f"active_{idx}")
 
                 # Continue conversation button
                 config = self.phase_config[phase_key]
@@ -314,6 +321,62 @@ class PECSLearningPage:
                 ui.button(
                     "Continue Conversation", icon="chat", on_click=continue_conv
                 ).classes("bg-purple-500 mt-2")
+
+    def _render_tts_button(self, text: str, unique_id: str):
+        """Render text-to-speech button for reading text aloud"""
+        async def read_aloud():
+            """Read the text aloud using TTS"""
+            try:
+                # Import voice service
+                from utils.voice_service import get_voice_service
+
+                voice_service = get_voice_service()
+
+                if not voice_service.is_available():
+                    ui.notify(
+                        "TTS requires OpenAI API key. Set OPENAI_API_KEY in .env",
+                        type="warning"
+                    )
+                    return
+
+                # Show generating dialog
+                with ui.dialog() as dialog, ui.card().classes("p-6"):
+                    ui.label("🔊 Generating speech...").classes("text-lg font-bold mb-4")
+                    ui.spinner(size="lg")
+
+                dialog.open()
+
+                # Generate speech in background
+                audio_path = await asyncio.to_thread(
+                    voice_service.text_to_speech,
+                    text
+                )
+
+                dialog.close()
+
+                # Play audio via JavaScript
+                import base64
+                with open(audio_path, 'rb') as audio_file:
+                    audio_b64 = base64.b64encode(audio_file.read()).decode('utf-8')
+
+                await ui.run_javascript(f'''
+                    const audio = new Audio('data:audio/mp3;base64,{audio_b64}');
+                    audio.play().catch(err => console.error('Audio playback failed:', err));
+                ''')
+
+                # Cleanup temp file
+                voice_service.cleanup_temp_file(audio_path)
+
+                ui.notify("🔊 Playing audio...", type="positive")
+
+            except Exception as e:
+                logging.error(f"TTS failed: {e}", exc_info=True)
+                ui.notify(f"TTS failed: {str(e)}", type="negative")
+
+        ui.button(
+            "🔊 Read Aloud",
+            on_click=read_aloud
+        ).classes("bg-indigo-500 text-xs").props("size=sm")
 
     def _render_learning_phase(self, phase_key: str):
         """Generic learning phase renderer (DRY principle)"""
@@ -387,6 +450,19 @@ class PECSLearningPage:
                     )
                     .classes("w-full")
                     .props(f"rows={config['rows']}")
+                )
+
+                # Add voice input buttons
+                def on_voice_transcribe(text: str):
+                    """Callback when voice transcription completes"""
+                    # Auto-save after voice input
+                    self._save_phase_data(phase_key, config["field"], input_widget.value)
+
+                add_voice_input_buttons(
+                    input_widget,
+                    section_content=self.section.content,
+                    phase=phase_key,
+                    on_transcribe=on_voice_transcribe,
                 )
 
                 # Async wrappers
