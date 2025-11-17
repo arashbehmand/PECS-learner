@@ -1151,7 +1151,7 @@ service = VoiceService(
 
 ### Documentation
 
-- **User guide**: `VOICE_FEATURES.md` - Complete user documentation
+- **User guide**: See "Voice Input & Text-to-Speech" section in `README.md`
 - **Code examples**: `tests/test_voice_service.py`
 - **Integration**: `nicegui_app/components/voice_input.py`
 

@@ -19,6 +19,7 @@
 
 ✨ **Uses proven learning science** (active recall, spaced repetition, Feynman technique)
 🤖 **Leverages AI for personalized feedback** (supports 100+ models via LiteLLM)
+🎤 **Voice input & text-to-speech** (speak your thoughts, hear AI feedback aloud)
 📱 **Works anywhere** (PWA installable on any device)
 🔄 **Generates intelligent study notes** with rolling context across sections
 📊 **Tracks your progress** with SM-2 spaced repetition algorithm
@@ -84,6 +85,38 @@ Each phase unlocks sequentially, guiding you through a proven learning process.
   - Track token usage and costs
   - Monitor AI response quality
   - Debug and optimize prompts
+
+### 🎤 Voice Input & Text-to-Speech
+
+**Speak your thoughts naturally** - Because talking is often easier than writing when learning new concepts!
+
+- **🎙️ High-Quality Voice Input** (OpenAI Whisper)
+  - Record your explanations and thoughts
+  - 90%+ transcription accuracy
+  - Context-aware (understands what you're studying)
+  - Handles technical terminology excellently
+  - Works on all browsers
+  - Cost: ~$0.006/minute (very affordable!)
+
+- **🎤 Real-Time Voice Input** (Web Speech API)
+  - Instant transcription as you speak
+  - Completely FREE
+  - Perfect for quick notes
+  - Works in Chrome, Edge, Safari
+
+- **🔊 Text-to-Speech**
+  - Listen to AI feedback read aloud
+  - 6 natural-sounding voices to choose from
+  - Great for auditory learners
+  - Perfect for reviewing while multitasking
+
+**How it works:**
+1. Click the voice button below any text area
+2. Speak naturally - explain your thoughts
+3. Transcription automatically inserts into the text field
+4. Click "🔊 Read Aloud" on any AI response to hear it
+
+**Cost for individual use**: ~$3-5/month with regular use (10 recordings/week)
 
 ### 📚 Content Management
 
@@ -227,6 +260,11 @@ LLM_MODEL_DEFAULT=gpt-5-mini        # For general feedback
 # === Rolling Context Configuration ===
 ROLLING_CONTEXT_MAX_CHARS=10000     # Safety limit
 ROLLING_CONTEXT_TARGET_TOKENS=400   # Target summary size
+
+# === Voice Input & TTS (optional) ===
+TTS_VOICE=nova                      # Options: alloy, echo, fable, onyx, nova, shimmer
+TTS_MODEL=tts-1                     # tts-1 (faster) or tts-1-hd (higher quality)
+WHISPER_MODEL=whisper-1             # Whisper model for transcription
 
 # === LLM Observability (optional) ===
 LANGFUSE_PUBLIC_KEY=pk-...
@@ -526,6 +564,7 @@ Unified API for **100+ LLM providers**:
 - [x] **Rolling window context** (NEW!)
 - [x] **AI study notes generation** (NEW!)
 - [x] **Non-blocking UI with real-time progress** (NEW!)
+- [x] **Voice input & text-to-speech** (NEW!)
 
 ### 🚧 In Progress
 - [ ] Advanced analytics dashboard
@@ -537,8 +576,8 @@ Unified API for **100+ LLM providers**:
 - [ ] Collaborative study groups
 - [ ] Mobile native apps (React Native)
 - [ ] Browser extension for highlighting
-- [ ] Voice input for PECS phases
 - [ ] Export to Notion, Obsidian, Roam
+- [ ] Offline voice input (local Whisper models)
 
 ---
 
