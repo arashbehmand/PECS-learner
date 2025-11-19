@@ -9,7 +9,7 @@ litellm>=1.50.0
 openai>=1.0.0
 sqlalchemy>=2.0.0
 pyyaml>=6.0.0
-langfuse>=2.0.0
+langfuse==2.22.0
 
 # File conversion
 markitdown>=0.0.1a9
